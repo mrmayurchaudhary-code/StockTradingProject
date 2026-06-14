@@ -338,8 +338,7 @@ const FALLBACK = (() => {
   };
 
   const livePrice = (symbol) => {
-    const info = STOCKS[symbol];
-    if (!info) return { base: 1000, change: 0, pct: 0 };
+    const info = STOCKS[symbol] || { base: 1000 };
     const seed = getSeed(symbol);
     const intraVolatility = 0.015;
     const chgPct = seed * intraVolatility + (Math.random() - 0.499) * 0.003;

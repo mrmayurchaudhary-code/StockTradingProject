@@ -454,38 +454,97 @@
 /* ── SECTOR HEATMAP ── */
 .heatmap-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .heatmap-cell {
-  padding: 10px 8px;
+  padding: 12px;
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  min-height: 110px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.heatmap-cell:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.sector-header {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
-  min-height: 62px;
-  text-align: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 6px;
 }
 
-.heatmap-cell:hover { transform: scale(1.04); }
-
-.heatmap-name {
-  font-size: 0.62rem;
+.sector-title {
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.3px;
   text-transform: uppercase;
-  opacity: 0.85;
-  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
 }
 
-.heatmap-val {
+.sector-avg {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 700;
+}
+
+.sector-avg.positive { color: var(--color-positive); }
+.sector-avg.negative { color: var(--color-negative); }
+
+.sector-stocks-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.sector-stock-badge {
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.65rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+  outline: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  user-select: none;
+}
+
+.sector-stock-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
+  filter: brightness(1.2);
+}
+
+.sector-stock-badge:active {
+  transform: scale(0.98);
+}
+
+.stock-ticker {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  opacity: 0.95;
+}
+
+.stock-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.62rem;
+  opacity: 0.9;
 }
 
 /* ── MARKET BREADTH ── */

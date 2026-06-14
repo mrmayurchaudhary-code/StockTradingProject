@@ -25,20 +25,68 @@ const Dashboard = (() => {
     'BAJFINANCE.NS', 'MARUTI.NS', 'TITAN.NS', 'GC=F', 'INR=X',
   ];
 
-  const SECTORS = [
-    { name: 'IT',          symbol: '^CNXIT',    base: 38900, icon: '💻' },
-    { name: 'Banking',     symbol: '^NSEBANK',  base: 53200, icon: '🏦' },
-    { name: 'Auto',        symbol: '^CNXAUTO',  base: 22400, icon: '🚗' },
-    { name: 'Pharma',      symbol: '^CNXPHARMA',base: 21100, icon: '💊' },
-    { name: 'Energy',      symbol: 'ONGC.NS',   base: 295,   icon: '⚡' },
-    { name: 'FMCG',        symbol: 'HINDUNILVR.NS', base: 2480, icon: '🛒' },
-    { name: 'Metals',      symbol: 'JSWSTEEL.NS', base: 1020, icon: '🔩' },
-    { name: 'Realty',      symbol: 'ADANIENT.NS', base: 2680, icon: '🏢' },
-    { name: 'Infra',       symbol: 'LT.NS',     base: 3580,  icon: '🏗️' },
-    { name: 'Telecom',     symbol: 'BHARTIARTL.NS', base: 1680, icon: '📡' },
-    { name: 'Consumer',    symbol: 'TITAN.NS',  base: 3410,  icon: '💎' },
-    { name: 'Cement',      symbol: 'ULTRACEMCO.NS', base: 10580, icon: '🏭' },
-  ];
+  const SECTOR_GROUPS = {
+    'IT': {
+      name: 'IT',
+      icon: '💻',
+      stocks: ['TCS.NS', 'INFY.NS', 'WIPRO.NS', 'HCLTECH.NS', 'TECHM.NS']
+    },
+    'Banking': {
+      name: 'Banking',
+      icon: '🏦',
+      stocks: ['HDFCBANK.NS', 'ICICIBANK.NS', 'KOTAKBANK.NS', 'AXISBANK.NS', 'SBIN.NS']
+    },
+    'Auto': {
+      name: 'Auto',
+      icon: '🚗',
+      stocks: ['MARUTI.NS', 'TATAMOTORS.NS', 'M&M.NS', 'BAJAJ-AUTO.NS', 'EICHERMOT.NS']
+    },
+    'Pharma': {
+      name: 'Pharma',
+      icon: '💊',
+      stocks: ['SUNPHARMA.NS', 'CIPLA.NS', 'DRREDDY.NS', 'DIVISLAB.NS']
+    },
+    'Energy': {
+      name: 'Energy',
+      icon: '⚡',
+      stocks: ['RELIANCE.NS', 'NTPC.NS', 'POWERGRID.NS', 'ONGC.NS', 'COALINDIA.NS']
+    },
+    'FMCG': {
+      name: 'FMCG',
+      icon: '🛒',
+      stocks: ['HINDUNILVR.NS', 'ITC.NS', 'NESTLEIND.NS', 'BRITANNIA.NS', 'TATACONSUM.NS']
+    },
+    'Metals': {
+      name: 'Metals',
+      icon: '🔩',
+      stocks: ['JSWSTEEL.NS', 'TATASTEEL.NS', 'HINDALCO.NS', 'VEDL.NS']
+    },
+    'Realty': {
+      name: 'Realty',
+      icon: '🏢',
+      stocks: ['DLF.NS', 'GODREJPROP.NS', 'OBEROIRLTY.NS']
+    },
+    'Infra': {
+      name: 'Infra',
+      icon: '🏗️',
+      stocks: ['LT.NS', 'ADANIENT.NS', 'ADANIPORTS.NS', 'GRASIM.NS']
+    },
+    'Telecom': {
+      name: 'Telecom',
+      icon: '📡',
+      stocks: ['BHARTIARTL.NS', 'IDEA.NS', 'INDUSTOWER.NS']
+    },
+    'Consumer': {
+      name: 'Consumer',
+      icon: '💎',
+      stocks: ['TITAN.NS', 'ASIANPAINT.NS', 'HAVELLS.NS', 'VOLTAS.NS']
+    },
+    'Cement': {
+      name: 'Cement',
+      icon: '🏭',
+      stocks: ['ULTRACEMCO.NS', 'GRASIM.NS', 'AMBUJACEM.NS', 'ACC.NS']
+    }
+  };
 
   const NSE_MOVERS = [
     'RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS',
@@ -69,9 +117,9 @@ const Dashboard = (() => {
       loadIndexData(),
       loadTickerTape(),
       loadMovers(),
+      renderSectorHeatmap(),
     ]);
     renderBreadth();
-    renderSectorHeatmap();
   };
 
   // ── INDEX CARDS ──
@@ -189,24 +237,116 @@ const Dashboard = (() => {
   };
 
   // ── SECTOR HEATMAP ──
-  const renderSectorHeatmap = () => {
+  const renderSectorHeatmap = async () => {
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
 
-    grid.innerHTML = SECTORS.map(s => {
-      const chgPct = (Math.random() - 0.47) * 4;
-      const positive = chgPct >= 0;
-      const intensity = Math.min(Math.abs(chgPct) / 4, 1);
-      const bg = positive
-        ? `rgba(0, 217, 126, ${0.1 + intensity * 0.5})`
-        : `rgba(255, 71, 87, ${0.1 + intensity * 0.5})`;
-      const textColor = positive ? '#00d97e' : '#ff4757';
+    // Gather all unique symbols across sectors
+    const uniqueSymbols = [];
+    for (const key in SECTOR_GROUPS) {
+      SECTOR_GROUPS[key].stocks.forEach(s => {
+        if (!uniqueSymbols.includes(s)) uniqueSymbols.push(s);
+      });
+    }
 
-      return `<div class="heatmap-cell" style="background:${bg};border:1px solid ${bg}">
-        <div class="heatmap-name" style="color:${textColor}">${FMT.escHtml(s.name)}</div>
-        <div class="heatmap-val" style="color:${textColor}">${FMT.pct(chgPct)}</div>
-      </div>`;
-    }).join('');
+    // Fetch quotes in batch
+    let quotesMap = {};
+    try {
+      const quotes = await API.getMultipleQuotes(uniqueSymbols);
+      uniqueSymbols.forEach((sym, idx) => {
+        if (quotes[idx]) {
+          quotesMap[sym] = quotes[idx];
+        }
+      });
+    } catch (err) {
+      console.error('Failed to load sector heatmap quotes:', err);
+    }
+
+    const getStockQuote = (sym) => {
+      return quotesMap[sym] || FALLBACK.getQuote(sym);
+    };
+
+    const sectorHtml = [];
+    for (const key in SECTOR_GROUPS) {
+      const sec = SECTOR_GROUPS[key];
+      let sumPct = 0;
+      let count = 0;
+      const stockBadges = [];
+
+      sec.stocks.forEach(sym => {
+        const q = getStockQuote(sym);
+        if (q && typeof q.changePct === 'number') {
+          sumPct += q.changePct;
+          count++;
+
+          const rawSym = sym.replace('.NS', '').replace('.BO', '');
+          const positiveStock = q.changePct >= 0;
+          const stockIntensity = Math.min(Math.abs(q.changePct) / 3, 0.95);
+          const badgeBg = positiveStock
+            ? `rgba(0, 217, 126, ${0.15 + stockIntensity * 0.7})`
+            : `rgba(255, 71, 87, ${0.15 + stockIntensity * 0.7})`;
+          const borderStyle = positiveStock
+            ? `rgba(0, 217, 126, 0.4)`
+            : `rgba(255, 71, 87, 0.4)`;
+          const textColor = '#ffffff';
+
+          stockBadges.push(`
+            <div class="sector-stock-badge" 
+                 style="background:${badgeBg}; border:1px solid ${borderStyle}; color:${textColor}" 
+                 data-symbol="${FMT.escHtml(sym)}" 
+                 title="${FMT.escHtml(q.name || rawSym)}: ₹${FMT.price(q.price)} (${FMT.pct(q.changePct)})"
+                 role="button"
+                 tabindex="0">
+              <span class="stock-ticker">${FMT.escHtml(rawSym)}</span>
+              <span class="stock-val">${FMT.pct(q.changePct)}</span>
+            </div>
+          `);
+        }
+      });
+
+      const avgChangePct = count > 0 ? (sumPct / count) : 0;
+      const positiveSector = avgChangePct >= 0;
+      const secColorClass = positiveSector ? 'positive' : 'negative';
+      const secArrow = positiveSector ? '▲' : '▼';
+
+      // Sector-level card glow / light tint based on its average performance
+      const sectorIntensity = Math.min(Math.abs(avgChangePct) / 3, 0.9);
+      const cellBg = positiveSector
+        ? `rgba(0, 217, 126, ${0.03 + sectorIntensity * 0.08})`
+        : `rgba(255, 71, 87, ${0.03 + sectorIntensity * 0.08})`;
+
+      const html = `
+        <div class="heatmap-cell" style="background:${cellBg}" role="region" aria-label="${FMT.escHtml(sec.name)} Sector: ${FMT.pct(avgChangePct)}">
+          <div class="sector-header">
+            <span class="sector-title">${sec.icon} ${FMT.escHtml(sec.name)}</span>
+            <span class="sector-avg ${secColorClass}">${secArrow} ${FMT.pct(avgChangePct)}</span>
+          </div>
+          <div class="sector-stocks-grid">
+            ${stockBadges.join('')}
+          </div>
+        </div>
+      `;
+      sectorHtml.push(html);
+    }
+
+    grid.innerHTML = sectorHtml.join('');
+
+    // Bind click and keypress handlers to individual stock badges
+    grid.querySelectorAll('.sector-stock-badge').forEach(badge => {
+      badge.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const sym = badge.dataset.symbol;
+        if (sym) AppState.openStockModal(sym);
+      });
+      badge.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          const sym = badge.dataset.symbol;
+          if (sym) AppState.openStockModal(sym);
+        }
+      });
+    });
   };
 
   // ── TOP MOVERS ──
@@ -276,9 +416,13 @@ const Dashboard = (() => {
 
   // ── REFRESH ──
   const refresh = async () => {
-    await Promise.all([loadIndexData(), loadTickerTape(), loadMovers()]);
+    await Promise.all([
+      loadIndexData(),
+      loadTickerTape(),
+      loadMovers(),
+      renderSectorHeatmap(),
+    ]);
     renderBreadth();
-    renderSectorHeatmap();
   };
 
   return { init, refresh };
