@@ -1,0 +1,5 @@
+# Temporary files
+*.json
+*.py
+.DS_Store
+Thumbs.db

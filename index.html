@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' https://query1.finance.yahoo.com https://query2.finance.yahoo.com https://corsproxy.io https://api.allorigins.win https://finance.yahoo.com;" />
+  <meta name="description" content="Samadhan Trading — India's most powerful equity trading dashboard for NSE, BSE, ETF, Mutual Funds, F&O, Commodities, and Currency markets with real-time data." />
+  <meta name="keywords" content="NSE, BSE, NIFTY, SENSEX, stock trading, Indian equity market, ETF, mutual funds, F&O, commodities, currency" />
+  <meta name="author" content="Samadhan Trading" />
+  <meta property="og:title" content="Samadhan Trading — Indian Equity Dashboard" />
+  <meta property="og:description" content="Real-time Indian stock market dashboard with NSE, BSE, ETF, MF, F&O, Commodities & Currency" />
+  <title>Samadhan Trading — Indian Equity Dashboard</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Remix Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.3.0/fonts/remixicon.css" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <!-- TradingView Lightweight Charts -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.7/dist/lightweight-charts.standalone.production.js"></script>
+
+  <!-- App Styles -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/charts.css" />
+  <!-- ApexCharts & Scanner Styles -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <link rel="stylesheet" href="scanner/scanner.css" />
+</head>
+<body>
+
+  <!-- ==================== TICKER TAPE ==================== -->
+  <div class="ticker-tape" id="tickerTape" role="marquee" aria-label="Live market prices">
+    <div class="ticker-inner" id="tickerInner">
+      <span class="ticker-loading">Loading live market data...</span>
+    </div>
+  </div>
+
+  <!-- ==================== APP SHELL ==================== -->
+  <div class="app-shell">
+
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <i class="ri-line-chart-fill"></i>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">Samadhan</span>
+          <span class="logo-tagline">Trading</span>
+        </div>
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+          <i class="ri-menu-3-line"></i>
+        </button>
+      </div>
+
+      <!-- Market Status -->
+      <div class="market-status-pill" id="marketStatusPill">
+        <span class="status-dot"></span>
+        <span class="status-text" id="marketStatusText">Checking...</span>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Overview</div>
+        <a href="#dashboard" class="nav-item active" data-segment="dashboard" id="nav-dashboard" aria-current="page">
+          <i class="ri-dashboard-3-fill nav-icon"></i>
+          <span class="nav-label">Dashboard</span>
+          <div class="nav-glow"></div>
+        </a>
+
+        <div class="nav-section-label">Markets</div>
+        <a href="#nse" class="nav-item" data-segment="nse" id="nav-nse">
+          <i class="ri-bar-chart-grouped-fill nav-icon"></i>
+          <span class="nav-label">NSE</span>
+          <span class="nav-badge">Live</span>
+        </a>
+        <a href="#bse" class="nav-item" data-segment="bse" id="nav-bse">
+          <i class="ri-stock-fill nav-icon"></i>
+          <span class="nav-label">BSE</span>
+          <span class="nav-badge">Live</span>
+        </a>
+        <a href="#etf" class="nav-item" data-segment="etf" id="nav-etf">
+          <i class="ri-funds-fill nav-icon"></i>
+          <span class="nav-label">ETF</span>
+        </a>
+        <a href="#mf" class="nav-item" data-segment="mf" id="nav-mf">
+          <i class="ri-bank-fill nav-icon"></i>
+          <span class="nav-label">Mutual Funds</span>
+        </a>
+
+        <div class="nav-section-label">Derivatives</div>
+        <a href="#fo" class="nav-item" data-segment="fo" id="nav-fo">
+          <i class="ri-exchange-fill nav-icon"></i>
+          <span class="nav-label">F&amp;O</span>
+          <span class="nav-badge pro">Pro</span>
+        </a>
+        <a href="#commodity" class="nav-item" data-segment="commodity" id="nav-commodity">
+          <i class="ri-copper-coin-fill nav-icon"></i>
+          <span class="nav-label">Commodities</span>
+        </a>
+        <a href="#currency" class="nav-item" data-segment="currency" id="nav-currency">
+          <i class="ri-currency-fill nav-icon"></i>
+          <span class="nav-label">Currency</span>
+        </a>
+
+        <div class="nav-section-label">Tools</div>
+        <a href="#watchlist" class="nav-item" data-segment="watchlist" id="nav-watchlist">
+          <i class="ri-bookmark-fill nav-icon"></i>
+          <span class="nav-label">Watchlist</span>
+          <span class="nav-count" id="watchlistCount">0</span>
+        </a>
+        <a href="#screener" class="nav-item" data-segment="screener" id="nav-screener">
+          <i class="ri-filter-3-fill nav-icon"></i>
+          <span class="nav-label">Screener</span>
+        </a>
+        <a href="#scanner" class="nav-item" data-segment="scanner" id="nav-scanner">
+          <i class="ri-radar-line nav-icon"></i>
+          <span class="nav-label">Scanner</span>
+          <span class="nav-badge pro">Signals</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="data-source-badge">
+          <i class="ri-database-2-fill"></i>
+          <span>Yahoo Finance</span>
+        </div>
+        <div class="refresh-timer" id="refreshTimer">
+          <i class="ri-refresh-line"></i>
+          <span id="refreshCountdown">30s</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <div class="main-wrapper">
+
+      <!-- Header -->
+      <header class="app-header" role="banner">
+        <div class="header-left">
+          <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Open menu">
+            <i class="ri-menu-2-line"></i>
+          </button>
+          <div class="search-container" role="search">
+            <i class="ri-search-2-line search-icon"></i>
+            <input type="text" id="globalSearch" class="search-input" placeholder="Search stocks, ETFs, MFs..." autocomplete="off" maxlength="50" aria-label="Search stocks" />
+            <div class="search-results" id="searchResults" role="listbox" aria-label="Search results"></div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="index-pill" id="niftyPill">
+            <span class="index-name">NIFTY</span>
+            <span class="index-value" id="headerNifty">--</span>
+            <span class="index-change" id="headerNiftyChange">--</span>
+          </div>
+          <div class="index-pill" id="sensexPill">
+            <span class="index-name">SENSEX</span>
+            <span class="index-value" id="headerSensex">--</span>
+            <span class="index-change" id="headerSensexChange">--</span>
+          </div>
+          <button class="icon-btn" id="themeToggle" aria-label="Toggle theme">
+            <i class="ri-sun-fill"></i>
+          </button>
+          <button class="icon-btn notification-btn" id="notificationBtn" aria-label="Notifications">
+            <i class="ri-notification-3-fill"></i>
+            <span class="notif-badge">3</span>
+          </button>
+          <div class="user-avatar" id="userAvatar" role="button" aria-label="User profile" tabindex="0">
+            <span>ST</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Title Bar -->
+      <div class="page-title-bar">
+        <div class="page-title-content">
+          <h1 class="page-title" id="pageTitle">Market Dashboard</h1>
+          <p class="page-subtitle" id="pageSubtitle">Real-time Indian equity market overview</p>
+        </div>
+        <div class="page-actions" id="pageActions">
+          <button class="btn btn-sm btn-ghost" id="refreshBtn" aria-label="Refresh data">
+            <i class="ri-refresh-line"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- ==================== CONTENT SECTIONS ==================== -->
+      <main class="content-area" id="contentArea" role="main">
+
+        <!-- DASHBOARD SECTION -->
+        <section id="section-dashboard" class="content-section active" aria-label="Market Dashboard">
+          <!-- Indices Grid -->
+          <div class="indices-grid" id="indicesGrid">
+            <!-- Populated by dashboard.js -->
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+            <div class="index-card skeleton" aria-busy="true"><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+          </div>
+
+          <!-- Dashboard Lower Grid -->
+          <div class="dashboard-grid">
+            <!-- Gainers / Losers -->
+            <div class="glass-card gainers-losers-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-arrow-up-down-fill"></i> Top Movers</h2>
+                <div class="tab-group" id="moversTab" role="tablist">
+                  <button class="tab active" data-tab="gainers" role="tab" aria-selected="true">Gainers</button>
+                  <button class="tab" data-tab="losers" role="tab" aria-selected="false">Losers</button>
+                  <button class="tab" data-tab="active" role="tab" aria-selected="false">Active</button>
+                </div>
+              </div>
+              <div id="moversContent" class="movers-list">
+                <!-- Populated by dashboard.js -->
+              </div>
+            </div>
+
+            <!-- Market Breadth -->
+            <div class="glass-card breadth-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-pie-chart-fill"></i> Market Breadth</h2>
+                <span class="card-subtitle" id="breadthDate"></span>
+              </div>
+              <div class="breadth-chart-wrap">
+                <canvas id="breadthChart" width="220" height="220" aria-label="Market breadth pie chart"></canvas>
+                <div class="breadth-legend" id="breadthLegend"></div>
+              </div>
+              <div class="breadth-stats" id="breadthStats"></div>
+            </div>
+
+            <!-- Sector Heatmap -->
+            <div class="glass-card heatmap-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-fire-fill"></i> Sector Performance</h2>
+              </div>
+              <div class="heatmap-grid" id="heatmapGrid">
+                <!-- Populated by dashboard.js -->
+              </div>
+            </div>
+
+            <!-- Market News -->
+            <div class="glass-card news-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-newspaper-fill"></i> Market Pulse</h2>
+                <span class="live-badge"><i class="ri-radio-fill"></i> Live</span>
+              </div>
+              <div class="news-list" id="newsList">
+                <!-- Populated by dashboard.js -->
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- NSE SECTION -->
+        <section id="section-nse" class="content-section" aria-label="NSE Stocks" hidden>
+          <div class="segment-layout">
+            <div class="segment-sidebar">
+              <div class="glass-card">
+                <div class="card-header">
+                  <h2 class="card-title"><i class="ri-search-line"></i> NSE Stocks</h2>
+                </div>
+                <div class="stock-search-container">
+                  <input type="text" id="nseSearch" class="segment-search" placeholder="Search NSE stocks..." maxlength="30" aria-label="Search NSE stocks" />
+                </div>
+                <div class="stock-list" id="nseStockList"><!-- populated --></div>
+              </div>
+            </div>
+            <div class="segment-main" id="nseMain">
+              <div class="glass-card stock-detail-card" id="nseDetail">
+                <div class="empty-state">
+                  <i class="ri-bar-chart-grouped-fill"></i>
+                  <p>Select a stock to view details</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BSE SECTION -->
+        <section id="section-bse" class="content-section" aria-label="BSE Stocks" hidden>
+          <div class="segment-layout">
+            <div class="segment-sidebar">
+              <div class="glass-card">
+                <div class="card-header">
+                  <h2 class="card-title"><i class="ri-search-line"></i> BSE Stocks</h2>
+                </div>
+                <div class="stock-search-container">
+                  <input type="text" id="bseSearch" class="segment-search" placeholder="Search BSE stocks..." maxlength="30" aria-label="Search BSE stocks" />
+                </div>
+                <div class="stock-list" id="bseStockList"><!-- populated --></div>
+              </div>
+            </div>
+            <div class="segment-main" id="bseMain">
+              <div class="glass-card stock-detail-card" id="bseDetail">
+                <div class="empty-state">
+                  <i class="ri-stock-fill"></i>
+                  <p>Select a stock to view details</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ETF SECTION -->
+        <section id="section-etf" class="content-section" aria-label="ETF" hidden>
+          <div class="etf-grid" id="etfGrid"><!-- populated --></div>
+        </section>
+
+        <!-- MUTUAL FUNDS SECTION -->
+        <section id="section-mf" class="content-section" aria-label="Mutual Funds" hidden>
+          <div class="mf-categories" id="mfCategories"><!-- populated --></div>
+          <div class="mf-grid" id="mfGrid"><!-- populated --></div>
+        </section>
+
+        <!-- F&O SECTION -->
+        <section id="section-fo" class="content-section" aria-label="Futures and Options" hidden>
+          <div class="fo-layout">
+            <div class="fo-controls glass-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-exchange-fill"></i> F&amp;O Controls</h2>
+              </div>
+              <div class="fo-selectors">
+                <div class="selector-group">
+                  <label>Index</label>
+                  <div class="btn-group" id="foIndexBtnGroup">
+                    <button class="btn-select active" data-value="NIFTY" id="fo-nifty">NIFTY</button>
+                    <button class="btn-select" data-value="BANKNIFTY" id="fo-banknifty">BANKNIFTY</button>
+                    <button class="btn-select" data-value="FINNIFTY" id="fo-finnifty">FINNIFTY</button>
+                  </div>
+                </div>
+                <div class="selector-group">
+                  <label>Expiry</label>
+                  <select class="select-styled" id="foExpiry" aria-label="Select expiry date"></select>
+                </div>
+                <div class="selector-group">
+                  <label>Type</label>
+                  <div class="btn-group">
+                    <button class="btn-select active" data-value="options" id="fo-options">Options</button>
+                    <button class="btn-select" data-value="futures" id="fo-futures">Futures</button>
+                  </div>
+                </div>
+              </div>
+              <div class="fo-metrics" id="foMetrics"><!-- populated --></div>
+            </div>
+            <div class="fo-chain-wrap glass-card">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-table-fill"></i> Option Chain</h2>
+                <div class="pcr-display" id="pcrDisplay">
+                  <span class="pcr-label">PCR</span>
+                  <span class="pcr-value" id="pcrValue">--</span>
+                </div>
+              </div>
+              <div class="option-chain-table-wrap">
+                <table class="option-chain-table" id="optionChainTable" aria-label="Option chain">
+                  <thead>
+                    <tr>
+                      <th colspan="3" class="th-calls">CALLS</th>
+                      <th class="th-strike">STRIKE</th>
+                      <th colspan="3" class="th-puts">PUTS</th>
+                    </tr>
+                    <tr>
+                      <th>OI</th><th>Chng%</th><th>LTP</th>
+                      <th>PRICE</th>
+                      <th>LTP</th><th>Chng%</th><th>OI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="optionChainBody"><!-- populated --></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- COMMODITIES SECTION -->
+        <section id="section-commodity" class="content-section" aria-label="Commodities" hidden>
+          <div class="commodity-grid" id="commodityGrid"><!-- populated --></div>
+          <div class="glass-card commodity-chart-card" id="commodityChartCard">
+            <div class="card-header">
+              <h2 class="card-title" id="commodityChartTitle">Select a commodity</h2>
+              <div class="time-range-group" id="commodityTimeRange">
+                <button class="time-btn active" data-range="1mo">1M</button>
+                <button class="time-btn" data-range="3mo">3M</button>
+                <button class="time-btn" data-range="6mo">6M</button>
+                <button class="time-btn" data-range="1y">1Y</button>
+              </div>
+            </div>
+            <div class="chart-container" id="commodityChart"></div>
+          </div>
+        </section>
+
+        <!-- CURRENCY SECTION -->
+        <section id="section-currency" class="content-section" aria-label="Currency" hidden>
+          <div class="currency-grid" id="currencyGrid"><!-- populated --></div>
+          <div class="glass-card currency-chart-card" id="currencyChartCard">
+            <div class="card-header">
+              <h2 class="card-title" id="currencyChartTitle">Currency Chart</h2>
+              <div class="time-range-group" id="currencyTimeRange">
+                <button class="time-btn active" data-range="1mo">1M</button>
+                <button class="time-btn" data-range="3mo">3M</button>
+                <button class="time-btn" data-range="6mo">6M</button>
+                <button class="time-btn" data-range="1y">1Y</button>
+              </div>
+            </div>
+            <div class="chart-container" id="currencyChart"></div>
+          </div>
+        </section>
+
+        <!-- WATCHLIST SECTION -->
+        <section id="section-watchlist" class="content-section" aria-label="My Watchlist" hidden>
+          <div class="glass-card">
+            <div class="card-header">
+              <h2 class="card-title"><i class="ri-bookmark-fill"></i> My Watchlist</h2>
+              <div class="watchlist-controls">
+                <input type="text" id="watchlistSearch" class="segment-search" placeholder="Add symbol (e.g. RELIANCE)" maxlength="20" aria-label="Add symbol to watchlist" />
+                <button class="btn btn-primary" id="addToWatchlist" aria-label="Add to watchlist">
+                  <i class="ri-add-line"></i> Add
+                </button>
+              </div>
+            </div>
+            <div class="watchlist-table-wrap">
+              <table class="data-table" id="watchlistTable" aria-label="Watchlist">
+                <thead>
+                  <tr>
+                    <th>Symbol</th>
+                    <th>Name</th>
+                    <th>LTP</th>
+                    <th>Change</th>
+                    <th>Change %</th>
+                    <th>Volume</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="watchlistBody">
+                  <tr class="empty-row">
+                    <td colspan="7">
+                      <div class="empty-state">
+                        <i class="ri-bookmark-line"></i>
+                        <p>Your watchlist is empty. Add symbols to track them.</p>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCREENER SECTION -->
+        <section id="section-screener" class="content-section" aria-label="Stock Screener" hidden>
+          <div class="screener-layout">
+            <div class="glass-card screener-filters">
+              <div class="card-header">
+                <h2 class="card-title"><i class="ri-filter-3-fill"></i> Screen Stocks</h2>
+                <button class="btn btn-ghost btn-sm" id="resetFilters">Reset</button>
+              </div>
+              <div class="filter-group">
+                <label>Segment</label>
+                <select class="select-styled" id="filterSegment" aria-label="Filter by segment">
+                  <option value="all">All Segments</option>
+                  <option value="nse">NSE</option>
+                  <option value="bse">BSE</option>
+                  <option value="etf">ETF</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Market Cap</label>
+                <select class="select-styled" id="filterMarketCap" aria-label="Filter by market cap">
+                  <option value="all">All</option>
+                  <option value="large">Large Cap (&gt;₹20,000 Cr)</option>
+                  <option value="mid">Mid Cap (₹5,000–20,000 Cr)</option>
+                  <option value="small">Small Cap (&lt;₹5,000 Cr)</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>P/E Ratio</label>
+                <div class="range-inputs">
+                  <input type="number" id="filterPeMin" class="range-input" placeholder="Min" min="0" max="1000" aria-label="Minimum P/E" />
+                  <span>–</span>
+                  <input type="number" id="filterPeMax" class="range-input" placeholder="Max" min="0" max="1000" aria-label="Maximum P/E" />
+                </div>
+              </div>
+              <div class="filter-group">
+                <label>52W Performance</label>
+                <select class="select-styled" id="filter52w" aria-label="Filter by 52-week performance">
+                  <option value="all">All</option>
+                  <option value="near_high">Near 52W High (&gt;90%)</option>
+                  <option value="near_low">Near 52W Low (&lt;10%)</option>
+                  <option value="breakout">Breakout (&gt;10% monthly)</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label>Change %</label>
+                <select class="select-styled" id="filterChange" aria-label="Filter by price change">
+                  <option value="all">All</option>
+                  <option value="top_gainers">Top Gainers (&gt;3%)</option>
+                  <option value="top_losers">Top Losers (&lt;-3%)</option>
+                  <option value="positive">Positive</option>
+                  <option value="negative">Negative</option>
+                </select>
+              </div>
+              <button class="btn btn-primary btn-full" id="runScreener">
+                <i class="ri-search-line"></i> Run Screener
+              </button>
+            </div>
+            <div class="screener-results">
+              <div class="glass-card">
+                <div class="card-header">
+                  <h2 class="card-title">Results <span class="result-count" id="screenerCount">0 stocks</span></h2>
+                  <button class="btn btn-ghost btn-sm" id="exportResults">
+                    <i class="ri-download-2-line"></i> Export
+                  </button>
+                </div>
+                <div class="screener-table-wrap">
+                  <table class="data-table" id="screenerTable" aria-label="Screener results">
+                    <thead>
+                      <tr>
+                        <th data-sort="name">Symbol <i class="ri-arrow-up-down-line"></i></th>
+                        <th data-sort="price">LTP <i class="ri-arrow-up-down-line"></i></th>
+                        <th data-sort="change">Change% <i class="ri-arrow-up-down-line"></i></th>
+                        <th data-sort="volume">Volume <i class="ri-arrow-up-down-line"></i></th>
+                        <th data-sort="pe">P/E <i class="ri-arrow-up-down-line"></i></th>
+                        <th data-sort="marketCap">Mkt Cap <i class="ri-arrow-up-down-line"></i></th>
+                        <th>Segment</th>
+                      </tr>
+                    </thead>
+                    <tbody id="screenerBody">
+                      <tr class="empty-row">
+                        <td colspan="7">
+                          <div class="empty-state">
+                            <i class="ri-filter-3-line"></i>
+                            <p>Set filters and click "Run Screener" to see results</p>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCANNER SECTION -->
+        <section id="section-scanner" class="content-section" aria-label="Technical Scanner" hidden>
+          <!-- Controls Panel -->
+          <div class="glass-card scanner-controls-card">
+            <div class="card-header">
+              <h2 class="card-title"><i class="ri-radar-line"></i> Confluence Signal Setup</h2>
+              <span class="card-subtitle" id="sc_scanTimeLabel">Awaiting deployment</span>
+            </div>
+            <div class="scanner-flex-row">
+              <div class="scanner-ctrl-group">
+                <label for="sc_universe">Scan Universe</label>
+                <select id="sc_universe">
+                  <option value="nifty50">Nifty 50</option>
+                  <option value="nifty100">Nifty 100</option>
+                  <option value="nifty500">Nifty 500</option>
+                  <option value="midcap150">Nifty Midcap 150</option>
+                  <option value="smallcap250">Nifty Smallcap 250</option>
+                  <option value="liquid" selected>All NSE 750</option>
+                </select>
+              </div>
+              <div class="scanner-ctrl-group">
+                <label for="sc_sectorFilter">Sector Scope</label>
+                <select id="sc_sectorFilter">
+                  <option value="all">All Sectors</option>
+                </select>
+              </div>
+              <div class="scanner-ctrl-group">
+                <label for="sc_period">Lookback Window</label>
+                <select id="sc_period">
+                  <option value="365" selected>1 Year</option>
+                  <option value="548">1.5 Years</option>
+                  <option value="730">2 Years</option>
+                </select>
+              </div>
+              <div class="scanner-ctrl-group">
+                <label for="sc_concurrency">Parallel Requests</label>
+                <select id="sc_concurrency">
+                  <option value="1">1 — Conservative</option>
+                  <option value="2" selected>2 — Balanced</option>
+                  <option value="3">3 — Aggressive</option>
+                </select>
+              </div>
+              <div class="scanner-actions">
+                <button class="btn btn-sm btn-ghost" id="sc_wlToggle" onclick="Scanner.toggleWLPanel()"><i class="ri-star-line"></i> Tracked (<span id="sc_wlCount">0</span>)</button>
+                <button class="btn btn-scan-run" id="sc_runBtn" onclick="Scanner.runAll()"><i class="ri-flashlight-fill"></i> Deploy Scan</button>
+                <button class="btn btn-scan-stop" id="sc_stopBtn" onclick="Scanner.stopScan()" style="display:none;"><i class="ri-stop-circle-line"></i> Abort</button>
+              </div>
+            </div>
+
+            <!-- Sector navigation chips -->
+            <div style="margin-top:16px;">
+              <span class="sector-nav-label" id="sc_stockCount">— securities</span>
+              <div class="sector-chips-row" id="sc_sectorChips"></div>
+            </div>
+
+            <!-- Internal Parameters Accordion -->
+            <span class="scan-cond-summary" onclick="Scanner.toggleCondAccordion()"><i class="ri-arrow-down-s-line" id="sc_condChevron"></i> Internal Screening Parameters</span>
+            <div class="glass-card scan-cond-panel" id="sc_condPanel">
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c1" checked />
+                <span>Close > WMA(42) + ₹1</span>
+              </label>
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c2" checked />
+                <span>WMA(42) > WMA(84) + ₹2</span>
+              </label>
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c3" checked />
+                <span>Close > WMA(30) + ₹2</span>
+              </label>
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c4" checked />
+                <span>WMA(30) > WMA(60) + ₹2</span>
+              </label>
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c5" checked />
+                <span>Close > WMA(12)[last-4] + ₹2</span>
+              </label>
+              <label class="cond-checkbox-group">
+                <input type="checkbox" id="sc_c6" checked />
+                <span>Close > WMA(20)[last-2] + ₹2</span>
+              </label>
+              <div class="cond-input-group">
+                <label class="cond-checkbox-group">
+                  <input type="checkbox" id="sc_c7" checked />
+                  <span>Price Range</span>
+                </label>
+                <input type="number" id="sc_priceMin" value="25" placeholder="Min" />
+                <input type="number" id="sc_priceMax" value="100000" placeholder="Max" />
+              </div>
+              <div class="cond-input-group">
+                <label class="cond-checkbox-group">
+                  <input type="checkbox" id="sc_c8" checked />
+                  <span>5D Min Vol</span>
+                </label>
+                <input type="number" id="sc_minVol" value="100000" />
+              </div>
+              <div class="cond-input-group" style="grid-column: span 2;">
+                <label class="cond-checkbox-group">
+                  <input type="checkbox" id="sc_c9" checked />
+                  <span>EMA(20) Proximity</span>
+                </label>
+                <input type="number" id="sc_ema20dist" value="3" style="width: 50px;" />
+                <span>% Max</span>
+                <label class="cond-checkbox-group" style="margin-left: 8px;">
+                  <input type="checkbox" id="sc_c9above" checked />
+                  <span>Must close above EMA(20)</span>
+                </label>
+              </div>
+              <div class="cond-input-group">
+                <label class="cond-checkbox-group">
+                  <input type="checkbox" id="sc_c10" checked />
+                  <span>RSI(14) Range</span>
+                </label>
+                <input type="number" id="sc_rsiMin" value="40" />
+                <input type="number" id="sc_rsiMax" value="75" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Tracked Securities panel -->
+          <div class="glass-card scan-wl-panel" id="sc_wlPanel">
+            <div class="scan-wl-header">
+              <span class="scan-wl-title"><i class="ri-star-fill"></i> Tracked Securities</span>
+              <button class="btn btn-sm btn-ghost" onclick="Scanner.clearWatchlist()">Remove All</button>
+            </div>
+            <div class="scan-wl-chips" id="sc_wlChips"></div>
+          </div>
+
+          <!-- Progress card -->
+          <div class="glass-card scan-progress-card" id="sc_progressCard">
+            <div class="prog-header">
+              <span class="prog-title">Executing Technical Universe Scan</span>
+              <span class="prog-numbers" id="sc_progNums">0 / 0</span>
+            </div>
+            <div class="prog-track-bar"><div class="prog-fill-bar" id="sc_progFill"></div></div>
+            <div class="prog-log-grid" id="sc_progGrid"></div>
+          </div>
+
+          <!-- Stats Row -->
+          <div class="scan-stats-grid">
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-scanned">—</div>
+              <div class="lbl">Universe Scanned</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-buy" style="color:var(--color-positive)">—</div>
+              <div class="lbl">Long Signals</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-watch" style="color:var(--accent-gold)">—</div>
+              <div class="lbl">Active Setups</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-ema" style="color:var(--accent-purple)">—</div>
+              <div class="lbl">EMA Proximity</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-wma" style="color:var(--accent-cyan)">—</div>
+              <div class="lbl">Trend Aligned</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-watchlist" style="color:var(--accent-gold)">—</div>
+              <div class="lbl">Tracked</div>
+            </div>
+            <div class="glass-card scan-stat-card">
+              <div class="val" id="sc_st-err" style="color:var(--color-negative)">—</div>
+              <div class="lbl">Data Errors</div>
+            </div>
+          </div>
+
+          <!-- View Selector Tabs -->
+          <div class="scan-tab-bar">
+            <button class="scan-tab-btn active" data-tab="table" onclick="Scanner.switchTab('table')"><i class="ri-table-fill"></i> Signal Matrix</button>
+            <button class="scan-tab-btn" data-tab="charts" onclick="Scanner.switchTab('charts')"><i class="ri-bar-chart-2-fill"></i> Technical Profiles</button>
+          </div>
+
+          <!-- Signal Matrix View -->
+          <div id="sc_view-table" class="scan-view-panel">
+            <div class="glass-card scan-table-card">
+              <div class="scan-table-header">
+                <span class="scan-table-title"><i class="ri-line-chart-fill"></i> Signal Matrix</span>
+                <div class="scan-table-actions">
+                  <select id="sc_sigFilter" onchange="Scanner.applyFilter()">
+                    <option value="all">All Setups</option>
+                    <option value="BUY">Long Only</option>
+                    <option value="WATCH">In-Setup Only</option>
+                    <option value="FAIL">Neutral Only</option>
+                  </select>
+                  <select id="sc_sectorResultFilter" onchange="Scanner.applyFilter()">
+                    <option value="all">All Sectors</option>
+                  </select>
+                  <button class="btn btn-sm btn-ghost" id="sc_wlFilterBtn" onclick="Scanner.toggleWlFilter()"><i class="ri-star-line"></i> Tracked Only</button>
+                  <button class="btn btn-sm btn-ghost" onclick="Scanner.exportCSV()"><i class="ri-download-line"></i> Export CSV</button>
+                  <button class="btn btn-sm btn-ghost" onclick="Scanner.clearAll()"><i class="ri-delete-bin-line"></i> Clear</button>
+                </div>
+              </div>
+              <div class="scan-results-wrapper">
+                <table class="scan-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px;">⭐</th>
+                      <th data-sort="sym">Security <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="sector">Industry <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="close">LTP <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="chg">Delta% <i class="ri-arrow-up-down-line"></i></th>
+                      <th>30D Price Trend</th>
+                      <th data-sort="signal">Setup <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="ema20dist">EMA20 Dist <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="rsi">RSI14 <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="volRat">Vol Ratio <i class="ri-arrow-up-down-line"></i></th>
+                      <th data-sort="passCount">Confluence <i class="ri-arrow-up-down-line"></i></th>
+                      <th>Rules Breakdown</th>
+                      <th>Feed</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sc_resultBody">
+                    <tr>
+                      <td colspan="13">
+                        <div class="empty-state">
+                          <i class="ri-radar-line" style="font-size:1.8rem;color:var(--text-muted)"></i>
+                          <p>Scan universe is loaded. Click "Deploy Scan" above to run the analysis.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Technical Profiles View -->
+          <div id="sc_view-charts" class="scan-view-panel" style="display:none">
+            <div class="scan-charts-grid" id="sc_chartsGrid"></div>
+          </div>
+        </section>
+
+      </main><!-- /content-area -->
+    </div><!-- /main-wrapper -->
+  </div><!-- /app-shell -->
+
+  <!-- ==================== STOCK DETAIL MODAL ==================== -->
+  <div class="modal-overlay" id="stockModal" role="dialog" aria-modal="true" aria-labelledby="modalStockName" hidden>
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-stock-info">
+          <div class="modal-ticker" id="modalTicker"></div>
+          <div class="modal-name" id="modalStockName"></div>
+          <div class="modal-exchange-badge" id="modalExchange"></div>
+        </div>
+        <div class="modal-price-block">
+          <div class="modal-ltp" id="modalLtp"></div>
+          <div class="modal-change" id="modalChange"></div>
+        </div>
+        <button class="modal-close" id="closeModal" aria-label="Close modal">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-chart-header">
+          <div class="chart-type-toggle" id="chartTypeToggle">
+            <button class="chart-type-btn active" data-type="candlestick" aria-pressed="true">Candle</button>
+            <button class="chart-type-btn" data-type="line" aria-pressed="false">Line</button>
+            <button class="chart-type-btn" data-type="area" aria-pressed="false">Area</button>
+          </div>
+          <div class="time-range-group" id="modalTimeRange">
+            <button class="time-btn active" data-range="1d">1D</button>
+            <button class="time-btn" data-range="5d">5D</button>
+            <button class="time-btn" data-range="1mo">1M</button>
+            <button class="time-btn" data-range="3mo">3M</button>
+            <button class="time-btn" data-range="6mo">6M</button>
+            <button class="time-btn" data-range="1y">1Y</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+            <span style="font-size:0.75rem;color:var(--text-secondary);font-weight:600">Period:</span>
+            <select class="select-styled" style="padding:4px 8px;font-size:0.75rem;width:auto;border-radius:4px;background:var(--bg-3);border:1px solid var(--border-primary);color:var(--text-primary);" id="modalInterval">
+              <option value="1d" selected>1 Day</option>
+              <option value="1m">1 Min</option>
+              <option value="2m">2 Min</option>
+              <option value="3m">3 Min</option>
+              <option value="4m">4 Min</option>
+              <option value="5m">5 Min</option>
+              <option value="7m">7 Min</option>
+              <option value="10m">10 Min</option>
+              <option value="15m">15 Min</option>
+              <option value="20m">20 Min</option>
+              <option value="30m">30 Min</option>
+              <option value="60m">60 Min</option>
+            </select>
+          </div>
+        </div>
+        <div class="chart-container" id="modalChart" aria-label="Stock price chart"></div>
+        <div class="modal-stats-grid" id="modalStats"></div>
+        <div class="modal-actions">
+          <button class="btn btn-success" id="modalBuyBtn"><i class="ri-arrow-up-line"></i> Buy</button>
+          <button class="btn btn-danger" id="modalSellBtn"><i class="ri-arrow-down-line"></i> Sell</button>
+          <button class="btn btn-ghost" id="modalWatchBtn"><i class="ri-bookmark-line"></i> Watchlist</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST NOTIFICATIONS ==================== -->
+  <div class="toast-container" id="toastContainer" role="alert" aria-live="polite"></div>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/watchlist.js"></script>
+  <script src="js/screener.js"></script>
+  <script src="js/segments/nse.js"></script>
+  <script src="js/segments/bse.js"></script>
+  <script src="js/segments/etf.js"></script>
+  <script src="js/segments/mf.js"></script>
+  <script src="js/segments/fo.js"></script>
+  <script src="js/segments/commodity.js"></script>
+  <script src="js/segments/currency.js"></script>
+  <script src="scanner/scanner.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
