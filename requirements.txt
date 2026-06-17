@@ -1,0 +1,5 @@
+growwapi
+python-dotenv
+flask
+flask-cors
+pyotp

@@ -2,33 +2,104 @@
 
 /* ============================================================
    SAMADHAN TRADING — API MODULE
-   Yahoo Finance integration with CORS proxy + fallback data
+   Groww API (primary) + Yahoo Finance (fallback) + Simulation
+   Data priority: Groww Bridge → Yahoo Proxy → CORS Proxy → Simulation
    Security: Input sanitization, rate limiting, cache TTL
    ============================================================ */
 
 const API = (() => {
 
   // ── CONFIGURATION ──
+
+  // Groww API Bridge (primary — live Indian market data)
+  const GROWW_PROXY_BASE = '/api/groww';
+
+  // Local Yahoo proxy server (fallback)
+  const LOCAL_PROXY_BASE = '/api/yahoo1';   // Proxied via server.js
+  const LOCAL_PROXY2     = '/api/yahoo2';   // query2 endpoint
+
+  // CORS proxies (last resort when both Groww and Yahoo proxy fail)
   const CORS_PROXIES = [
-    'https://corsproxy.io/?',
+    'https://corsproxy.io/?url=',
     'https://api.allorigins.win/raw?url=',
+    'https://thingproxy.freeboard.io/fetch/',
+    'https://api.codetabs.com/v1/proxy?quest=',
   ];
 
-  const YAHOO_BASE = 'https://query1.finance.yahoo.com';
+  const YAHOO_BASE  = 'https://query1.finance.yahoo.com';
   const YAHOO_BASE2 = 'https://query2.finance.yahoo.com';
-  const CACHE_TTL = 30_000;   // 30 seconds
-  const RATE_LIMIT_MS = 500;  // 500ms between requests per symbol
-  const MAX_RETRIES = 2;
+  const CACHE_TTL      = 15_000;   // 15 seconds — faster live updates
+  const RATE_LIMIT_MS  = 300;      // 300ms between requests per symbol
+  const MAX_RETRIES    = 2;
 
   // ── INTERNAL STATE ──
   const _cache = new Map();
   const _lastRequest = new Map();
   const _pendingRequests = new Map();
+  let _localProxyAvailable = null;   // null = not checked, true/false = result
+  let _growwAvailable = null;        // null = not checked, true/false = result
+  let _growwAuthenticated = false;   // true when Groww bridge is running AND authenticated
+  let _dataSource = 'simulation';    // 'groww' | 'yahoo' | 'simulation'
+
+  // ── DETECT GROWW BRIDGE ──
+  const checkGrowwBridge = async () => {
+    if (_growwAvailable !== null) return _growwAvailable;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(`${GROWW_PROXY_BASE}/health`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      _growwAvailable = data.status === 'ok';
+      _growwAuthenticated = data.authenticated === true;
+      if (_growwAuthenticated) {
+        _dataSource = 'groww';
+        console.log('[Samadhan] 🟢 Groww API Bridge detected — LIVE market data active');
+      } else if (_growwAvailable) {
+        console.log('[Samadhan] 🟡 Groww Bridge running but NOT authenticated — check .env credentials');
+      }
+      return _growwAvailable && _growwAuthenticated;
+    } catch {
+      _growwAvailable = false;
+      _growwAuthenticated = false;
+      console.log('[Samadhan] ⚪ Groww Bridge not detected — trying Yahoo Finance');
+      return false;
+    }
+  };
+
+  // ── DETECT LOCAL YAHOO PROXY ──
+  const checkLocalProxy = async () => {
+    if (_localProxyAvailable !== null) return _localProxyAvailable;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch('/api/health', { signal: controller.signal });
+      clearTimeout(timer);
+      const data = await resp.json();
+      _localProxyAvailable = data.proxy === true;
+      if (_localProxyAvailable && _dataSource !== 'groww') {
+        _dataSource = 'yahoo';
+        console.log('[Samadhan] ✅ Yahoo proxy server detected');
+      }
+      return _localProxyAvailable;
+    } catch {
+      _localProxyAvailable = false;
+      console.log('[Samadhan] ⚠️  Yahoo proxy not found — using CORS proxy fallback');
+      return false;
+    }
+  };
+
+  // Initial checks on load (Groww first, then Yahoo)
+  (async () => {
+    await checkGrowwBridge();
+    await checkLocalProxy();
+  })();
 
   // ── INPUT SANITIZER ──
   const sanitizeSymbol = (s) => {
     if (typeof s !== 'string') return '';
-    return s.replace(/[^A-Za-z0-9.^=\-_]/g, '').slice(0, 20).toUpperCase();
+    return s.replace(/[^A-Za-z0-9.^=\-_&]/g, '').slice(0, 20).toUpperCase();
   };
 
   // ── RATE LIMITER ──
@@ -55,9 +126,130 @@ const API = (() => {
     }
   };
 
-  // ── FETCH WITH CORS PROXY ──
-  const fetchYahoo = async (path, proxyIndex = 0) => {
-    const cacheKey = path;
+  // ════════════════════════════════════════════════════════════
+  //  GROWW API PROVIDER (Primary)
+  // ════════════════════════════════════════════════════════════
+
+  const fetchGrowwQuote = async (symbol) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const resp = await fetch(`${GROWW_PROXY_BASE}/quote?symbol=${encodeURIComponent(symbol)}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Groww HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const fetchGrowwMultiQuotes = async (symbols) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const resp = await fetch(`${GROWW_PROXY_BASE}/quotes?symbols=${encodeURIComponent(symbols.join(','))}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Groww batch HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const fetchGrowwHistory = async (symbol, range, interval) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const params = new URLSearchParams({ symbol, range, interval });
+      const resp = await fetch(`${GROWW_PROXY_BASE}/history?${params}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Groww history HTTP ${resp.status}`);
+      const data = await resp.json();
+      return data.candles || [];
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════
+  //  YAHOO FINANCE PROVIDER (Fallback)
+  // ════════════════════════════════════════════════════════════
+
+  // ── FETCH VIA LOCAL PROXY (primary) ──
+  const fetchViaLocalProxy = async (path) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const url = `${LOCAL_PROXY_BASE}${path}`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!response.ok) throw new Error(`Local proxy HTTP ${response.status}`);
+      return await response.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  // ── FETCH VIA CORS PROXIES (fallback) ──
+  const fetchViaCorsProxy = async (path) => {
+    const fullUrl = `${YAHOO_BASE}${path}`;
+    let lastError;
+
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 8000);
+      try {
+        const url = `${CORS_PROXIES[i]}${encodeURIComponent(fullUrl)}`;
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        });
+        clearTimeout(timer);
+        if (!response.ok) throw new Error(`CORS proxy ${i} HTTP ${response.status}`);
+        return await response.json();
+      } catch (err) {
+        clearTimeout(timer);
+        lastError = err;
+      }
+    }
+
+    // Last resort: try direct fetch (works in some environments)
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(fullUrl, {
+        signal: controller.signal,
+        mode: 'cors',
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!response.ok) throw new Error(`Direct fetch HTTP ${response.status}`);
+      return await response.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw lastError || err;
+    }
+  };
+
+  // ── UNIFIED YAHOO FETCH: Local Proxy → CORS Proxies ──
+  const fetchYahoo = async (path) => {
+    const cacheKey = `yahoo:${path}`;
     const cached = fromCache(cacheKey);
     if (cached) return cached;
 
@@ -65,33 +257,26 @@ const API = (() => {
     if (_pendingRequests.has(cacheKey)) return _pendingRequests.get(cacheKey);
 
     const promise = (async () => {
-      const fullUrl = `${YAHOO_BASE}${path}`;
-      let lastError;
-
-      for (let i = proxyIndex; i < CORS_PROXIES.length + 1; i++) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+      // 1. Try local proxy first (fastest)
+      const useLocal = await checkLocalProxy();
+      if (useLocal) {
         try {
-          let url, response;
-          if (i < CORS_PROXIES.length) {
-            url = `${CORS_PROXIES[i]}${encodeURIComponent(fullUrl)}`;
-            response = await fetch(url, { signal: controller.signal, headers: { 'Accept': 'application/json' } });
-          } else {
-            // Try direct (may work in some environments)
-            response = await fetch(fullUrl, { signal: controller.signal, mode: 'cors', headers: { 'Accept': 'application/json' } });
-          }
-          clearTimeout(timer);
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const data = await response.json();
+          const data = await fetchViaLocalProxy(path);
           toCache(cacheKey, data);
           return data;
         } catch (err) {
-          clearTimeout(timer);
-          lastError = err;
+          console.warn('[Samadhan] Local proxy failed, trying CORS fallback:', err.message);
         }
       }
-      // All failed, throw with original error
-      throw lastError || new Error('All fetch attempts failed');
+
+      // 2. Try CORS proxies as fallback
+      try {
+        const data = await fetchViaCorsProxy(path);
+        toCache(cacheKey, data);
+        return data;
+      } catch (err) {
+        throw err;
+      }
     })();
 
     _pendingRequests.set(cacheKey, promise);
@@ -99,7 +284,7 @@ const API = (() => {
     return promise;
   };
 
-  // ── PARSERS ──
+  // ── YAHOO PARSERS ──
   const parseChart = (raw, symbol) => {
     try {
       const res = raw.chart.result[0];
@@ -125,6 +310,7 @@ const API = (() => {
         week52Low: m.fiftyTwoWeekLow,
         pe: null, // not in chart endpoint
         _raw: true,
+        _source: 'yahoo',
       };
     } catch {
       return null;
@@ -149,17 +335,49 @@ const API = (() => {
     }
   };
 
-  // ── PUBLIC API ──
+  // ════════════════════════════════════════════════════════════
+  //  PUBLIC API  — Groww → Yahoo → Simulation
+  // ════════════════════════════════════════════════════════════
+
   const getQuote = async (symbol) => {
     symbol = sanitizeSymbol(symbol);
     if (!symbol) throw new Error('Invalid symbol');
+
+    // Check cache first
+    const cacheKey = `quote:${symbol}`;
+    const cached = fromCache(cacheKey);
+    if (cached) return cached;
+
     await waitForRateLimit(symbol);
+
+    // 1. Try Groww API first
+    const growwReady = await checkGrowwBridge();
+    if (growwReady) {
+      try {
+        const gq = await fetchGrowwQuote(symbol);
+        if (gq && gq._live && gq.price) {
+          _dataSource = 'groww';
+          toCache(cacheKey, gq);
+          return gq;
+        }
+      } catch (err) {
+        console.warn(`[Samadhan] Groww quote failed for ${symbol}:`, err.message);
+      }
+    }
+
+    // 2. Try Yahoo Finance
     try {
       const raw = await fetchYahoo(`/v8/finance/chart/${symbol}?interval=1d&range=1d`);
       const q = parseChart(raw, symbol);
-      if (q) return q;
+      if (q) {
+        if (_dataSource !== 'groww') _dataSource = 'yahoo';
+        toCache(cacheKey, q);
+        return q;
+      }
       throw new Error('Parse failed');
     } catch {
+      // 3. Simulation fallback
+      if (_dataSource !== 'groww') _dataSource = 'simulation';
       return FALLBACK.getQuote(symbol);
     }
   };
@@ -204,6 +422,20 @@ const API = (() => {
     symbol = sanitizeSymbol(symbol);
     if (!symbol) return [];
 
+    // 1. Try Groww API first
+    const growwReady = await checkGrowwBridge();
+    if (growwReady) {
+      try {
+        const hist = await fetchGrowwHistory(symbol, range, interval);
+        if (hist && hist.length > 0) {
+          return hist;
+        }
+      } catch (err) {
+        console.warn(`[Samadhan] Groww history failed for ${symbol}:`, err.message);
+      }
+    }
+
+    // 2. Fall through to Yahoo
     let queryInterval = interval;
     let resampleMinutes = 0;
 
@@ -233,16 +465,78 @@ const API = (() => {
   };
 
   const getMultipleQuotes = async (symbols) => {
+    // 1. Try Groww batch endpoint first
+    const growwReady = await checkGrowwBridge();
+    if (growwReady) {
+      try {
+        const results = await fetchGrowwMultiQuotes(symbols);
+        if (Array.isArray(results) && results.length > 0) {
+          // Fill in any failed items with fallback
+          return results.map((r, i) => {
+            if (r && r._live && r.price) return r;
+            return FALLBACK.getQuote(symbols[i]);
+          });
+        }
+      } catch (err) {
+        console.warn('[Samadhan] Groww batch quotes failed:', err.message);
+      }
+    }
+
+    // 2. Fall through to individual Yahoo quotes
     return Promise.all(symbols.map(s => getQuote(s).catch(() => FALLBACK.getQuote(s))));
   };
 
-  // ── SEARCH ──
+  // ── SEARCH (uses query2 endpoint) ──
+  const fetchYahooSearch = async (searchPath) => {
+    const cacheKey = `search:${searchPath}`;
+    const cached = fromCache(cacheKey);
+    if (cached) return cached;
+
+    // Try local proxy (query2 endpoint) first
+    const useLocal = await checkLocalProxy();
+    if (useLocal) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(`${LOCAL_PROXY2}${searchPath}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        });
+        clearTimeout(timer);
+        if (resp.ok) {
+          const data = await resp.json();
+          toCache(cacheKey, data);
+          return data;
+        }
+      } catch {}
+    }
+
+    // CORS proxy fallback for search
+    const fullUrl = `${YAHOO_BASE2}${searchPath}`;
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(`${CORS_PROXIES[i]}${encodeURIComponent(fullUrl)}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        });
+        clearTimeout(timer);
+        if (resp.ok) {
+          const data = await resp.json();
+          toCache(cacheKey, data);
+          return data;
+        }
+      } catch {}
+    }
+    throw new Error('Search fetch failed');
+  };
+
   const searchSymbols = async (query) => {
     query = query.replace(/[^A-Za-z0-9 ]/g, '').slice(0, 30);
     if (!query || query.length < 2) return [];
     try {
-      const url = `${YAHOO_BASE2}/v1/finance/search?q=${encodeURIComponent(query)}&newsCount=0&quotesCount=10&enableFuzzyQuery=false&region=IN`;
-      const raw = await fetchYahoo(`/v1/finance/search?q=${encodeURIComponent(query)}&newsCount=0&quotesCount=10&region=IN`);
+      const raw = await fetchYahooSearch(`/v1/finance/search?q=${encodeURIComponent(query)}&newsCount=0&quotesCount=10&enableFuzzyQuery=false&region=IN`);
       return (raw.quotes || []).filter(q => q.quoteType !== 'CRYPTOCURRENCY').slice(0, 8).map(q => ({
         symbol: q.symbol,
         name: q.longname || q.shortname || q.symbol,
@@ -256,8 +550,31 @@ const API = (() => {
 
   const invalidateCache = () => _cache.clear();
 
+  // Reset all provider detection (useful after starting servers)
+  const resetProxyCheck = () => {
+    _localProxyAvailable = null;
+    _growwAvailable = null;
+    _growwAuthenticated = false;
+    (async () => {
+      await checkGrowwBridge();
+      await checkLocalProxy();
+    })();
+  };
+
+  // Check if live data is available (either Groww or Yahoo)
+  const isLive = () => _growwAuthenticated || _localProxyAvailable === true;
+
+  // Check if Groww live data is active
+  const isGrowwLive = () => _growwAuthenticated;
+
+  // Get current data source identifier
+  const getDataSource = () => _dataSource;
+
   // ── EXPOSE ──
-  return { getQuote, getHistory, getMultipleQuotes, searchSymbols, invalidateCache };
+  return {
+    getQuote, getHistory, getMultipleQuotes, searchSymbols,
+    invalidateCache, resetProxyCheck, isLive, isGrowwLive, getDataSource,
+  };
 })();
 
 /* ============================================================

@@ -168,7 +168,7 @@ const AppState = (() => {
       { label: 'P/E Ratio', value: q.pe ? q.pe.toFixed(1) : (FALLBACK.getStockInfo(symbol)?.pe || '—') },
       { label: 'Exchange',  value: q.exchange || 'NSE' },
       { label: 'Currency',  value: q.currency || 'INR' },
-      { label: 'Simulated', value: q._simulated ? 'Demo Data' : 'Live Data', color: q._simulated ? 'var(--color-warning)' : 'var(--color-positive)' },
+      { label: 'Data Source', value: q._live ? 'Groww Live' : (q._source === 'yahoo' ? 'Yahoo Finance' : (q._simulated ? 'Demo Data' : 'Live Data')), color: q._live ? '#00d97e' : (q._source === 'yahoo' ? '#00d4ff' : (q._simulated ? 'var(--color-warning)' : 'var(--color-positive)')) },
     ].map(s => `<div class="stat-item">
       <div class="stat-label">${FMT.escHtml(s.label)}</div>
       <div class="stat-value" style="${s.color ? `color:${s.color}` : ''}">${FMT.escHtml(String(s.value))}</div>
@@ -237,14 +237,14 @@ const AppState = (() => {
 
   // ── REFRESH TIMER ──
   const startRefreshTimer = () => {
-    _refreshCountdown = 30;
+    _refreshCountdown = 15;
     updateRefreshUI();
 
     _refreshInterval = setInterval(() => {
       _refreshCountdown--;
       updateRefreshUI();
       if (_refreshCountdown <= 0) {
-        _refreshCountdown = 30;
+        _refreshCountdown = 15;
         API.invalidateCache();
         refreshCurrentSegment();
       }
@@ -254,6 +254,14 @@ const AppState = (() => {
   const updateRefreshUI = () => {
     const el = document.getElementById('refreshCountdown');
     if (el) el.textContent = `${_refreshCountdown}s`;
+
+    // Update data source badge dynamically
+    const badge = document.getElementById('dataSourceText');
+    if (badge && API.getDataSource) {
+      const src = API.getDataSource();
+      const labels = { groww: 'Groww Live', yahoo: 'Yahoo Finance', simulation: 'Demo Data' };
+      badge.textContent = labels[src] || 'Demo Data';
+    }
   };
 
   const refreshCurrentSegment = async () => {
@@ -460,8 +468,10 @@ const Router = {
 
     // Show welcome toast
     setTimeout(() => {
-      AppState.toast('Welcome to Samadhan Trading! Data updates every 30 seconds.', 'info', 4000);
-    }, 1000);
+      const source = API.getDataSource ? API.getDataSource() : 'simulation';
+      const sourceLabel = source === 'groww' ? '🟢 Groww Live Data' : (source === 'yahoo' ? '✅ Yahoo Finance' : '📊 Demo Data');
+      AppState.toast(`Welcome to Samadhan Trading! ${sourceLabel} — Updates every 15 seconds.`, 'info', 5000);
+    }, 1500);
 
   } catch (err) {
     console.error('[Samadhan] Bootstrap error:', err);
