@@ -1,157 +1,60 @@
 'use strict';
 
 /* ============================================================
-   SAMADHAN TRADING — BREAKOUT KINGS UI COMPONENT RENDERER
-   Manages controls, data tables, and live filtering.
+   SAMADHAN TRADING — BREAKOUT KINGS UI v2
+   Card-based rendering with Canvas sparklines.
    ============================================================ */
 
 window.BreakoutKingsUI = (() => {
 
   let _scanResults = [];
-  let _sortCol = 'score';
-  let _sortDir = -1; // Default desc
 
-  const init = (onFilterChange, onSortChange) => {
-    setupSliders();
-    setupDropdowns(onFilterChange);
-    setupSortHeaders(onSortChange);
-  };
-
-  const setupSliders = () => {
-    const sliders = [
-      { id: 'bk_f_score_min', valId: 'bk_f_score_min_val', prec: 0 },
-      { id: 'bk_f_rsi_min', valId: 'bk_f_rsi_min_val', prec: 0 },
-      { id: 'bk_f_adx_min', valId: 'bk_f_adx_min_val', prec: 0 },
-      { id: 'bk_f_vol_ratio', valId: 'bk_f_vol_ratio_val', prec: 1 }
-    ];
-
-    sliders.forEach(s => {
-      const slider = document.getElementById(s.id);
-      const valLabel = document.getElementById(s.valId);
-      if (slider && valLabel) {
-        slider.addEventListener('input', (e) => {
-          const val = parseFloat(e.target.value);
-          valLabel.textContent = s.prec === 1 ? val.toFixed(1) : Math.round(val);
-          applyFilter();
-        });
-      }
-    });
-
-    document.getElementById('bk_f_price_min')?.addEventListener('input', () => {
-      applyFilter();
-    });
-  };
-
-  const setupDropdowns = (onFilterChange) => {
-    ['bk_f_category'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', () => {
-        applyFilter();
-      });
-    });
-  };
-
-  const setupSortHeaders = (onSortChange) => {
-    document.querySelector('#bk_scanner_table thead')?.addEventListener('click', (e) => {
-      const th = e.target.closest('th[data-sort]');
-      if (!th) return;
-      
-      const col = th.dataset.sort;
-      if (_sortCol === col) {
-        _sortDir = -_sortDir;
-      } else {
-        _sortCol = col;
-        _sortDir = -1; // Default to desc on first click
-      }
-
-      // Update header indicator icons
-      document.querySelectorAll('#bk_scanner_table th[data-sort]').forEach(header => {
-        const icon = header.querySelector('i');
-        if (icon) {
-          if (header.dataset.sort === _sortCol) {
-            icon.className = _sortDir === 1 ? 'ri-arrow-up-line' : 'ri-arrow-down-line';
-          } else {
-            icon.className = 'ri-arrow-up-down-line';
-          }
-        }
-      });
-
-      applyFilter();
+  const init = () => {
+    // Filter change listeners
+    ['bk_f_category', 'bk_sort_by', 'bk_f_score_min', 'bk_market_select'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => applyFilter());
     });
   };
 
   const updateResults = (results) => {
     _scanResults = results;
-    populateSectors();
     applyFilter();
-    updateStats();
-  };
-
-  const populateSectors = () => {
-    const dropdown = document.getElementById('bk_sector_select');
-    if (!dropdown) return;
-
-    // Collect sectors from existing global mappings or results
-    const sectors = new Set();
-    
-    // Look in App data or results
-    _scanResults.forEach(r => {
-      const info = window.API.getStockInfo(r.symbol) || {};
-      if (info.sector) sectors.add(info.sector);
-    });
-
-    // Reset and rebuild options
-    dropdown.innerHTML = '<option value="all" selected>All Sectors</option>';
-    Array.from(sectors).sort().forEach(sec => {
-      dropdown.innerHTML += `<option value="${FMT.escHtml(sec)}">${FMT.escHtml(sec)}</option>`;
-    });
-
-    dropdown.addEventListener('change', () => {
-      applyFilter();
-    });
+    updateHeroStats();
+    updateCategoryCards();
   };
 
   const getFilteredResults = () => {
-    const selectMarket = document.getElementById('bk_market_select')?.value || 'all';
-    const selectSector = document.getElementById('bk_sector_select')?.value || 'all';
-    
     const filterCat = document.getElementById('bk_f_category')?.value || 'all';
     const filterScoreMin = parseInt(document.getElementById('bk_f_score_min')?.value || '0', 10);
-    const filterRsiMin = parseInt(document.getElementById('bk_f_rsi_min')?.value || '0', 10);
-    const filterAdxMin = parseInt(document.getElementById('bk_f_adx_min')?.value || '0', 10);
-    const filterVolRatio = parseFloat(document.getElementById('bk_f_vol_ratio')?.value || '0');
-    const filterPriceMin = parseFloat(document.getElementById('bk_f_price_min')?.value) || 0;
+    const selectMarket = document.getElementById('bk_market_select')?.value || 'all';
+    const sortBy = document.getElementById('bk_sort_by')?.value || 'score';
 
     let filtered = _scanResults.filter(r => {
-      // Market filter
-      const sym = r.symbol.toUpperCase();
-      if (selectMarket === 'nse' && !sym.endsWith('.NS')) return false;
-      if (selectMarket === 'bse' && !sym.endsWith('.BO')) return false;
+      // Only show qualifying stocks (score >= 55)
+      if (r.category === 'Ignore') return false;
 
-      // Sector filter
-      const info = window.API.getStockInfo(r.symbol) || {};
-      if (selectSector !== 'all' && info.sector !== selectSector) return false;
+      // Market filter
+      if (selectMarket === 'nse' && !r.symbol.endsWith('.NS')) return false;
+      if (selectMarket === 'bse' && !r.symbol.endsWith('.BO')) return false;
 
       // Category filter
       if (filterCat === 'king' && r.category !== 'Breakout King') return false;
-      if (filterCat === 'strong' && r.category !== 'Strong Breakout') return false;
+      if (filterCat === 'strong' && r.category !== 'Strong') return false;
       if (filterCat === 'watchlist' && r.category !== 'Watchlist') return false;
 
-      // Sliders & inputs
+      // Score filter
       if (r.score < filterScoreMin) return false;
-      if (r.rsi != null && r.rsi < filterRsiMin) return false;
-      if (r.adx != null && r.adx < filterAdxMin) return false;
-      if (r.volRatio < filterVolRatio) return false;
-      if (r.price < filterPriceMin) return false;
 
       return true;
     });
 
-    // Sorting
+    // Sort: primary by selected, tiebreak by RS, then volRatio
     filtered.sort((a, b) => {
-      let va = a[_sortCol], vb = b[_sortCol];
-      if (va == null) return _sortDir;
-      if (vb == null) return -_sortDir;
-      return (va - vb) * _sortDir;
+      const va = a[sortBy] ?? 0;
+      const vb = b[sortBy] ?? 0;
+      if (vb !== va) return vb - va;
+      if (b.rsScore !== a.rsScore) return b.rsScore - a.rsScore;
+      return b.volRatio - a.volRatio;
     });
 
     return filtered;
@@ -159,98 +62,231 @@ window.BreakoutKingsUI = (() => {
 
   const applyFilter = () => {
     const data = getFilteredResults();
-    renderTable(data);
+    renderCards(data);
+    const matchEl = document.getElementById('bk_match_count');
+    if (matchEl) matchEl.textContent = `${data.length} results`;
   };
 
-  const updateStats = () => {
-    const scannedEl = document.getElementById('bk-total-scanned');
-    const kingsEl = document.getElementById('bk-kings-count');
-    const strongEl = document.getElementById('bk-strong-count');
-    const wlEl = document.getElementById('bk-watchlist-count');
+  const updateHeroStats = () => {
+    const qualifying = _scanResults.filter(r => r.category !== 'Ignore');
+    const kings = _scanResults.filter(r => r.category === 'Breakout King').length;
+    const strong = _scanResults.filter(r => r.category === 'Strong').length;
+    const watchlist = _scanResults.filter(r => r.category === 'Watchlist').length;
 
-    if (scannedEl) scannedEl.textContent = _scanResults.length;
-    if (kingsEl) kingsEl.textContent = _scanResults.filter(r => r.category === 'Breakout King').length;
-    if (strongEl) strongEl.textContent = _scanResults.filter(r => r.category === 'Strong Breakout').length;
-    if (wlEl) wlEl.textContent = _scanResults.filter(r => r.category === 'Watchlist').length;
+    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    el('bk_total_candidates', qualifying.length);
+    el('bk_kings_count', kings);
+    el('bk_strong_count', strong);
+    el('bk_watchlist_count', watchlist);
 
-    // Render timezone status badge in ribbon
-    const statusEl = document.getElementById('bk-market-status');
+    // Market status
+    const statusEl = document.getElementById('bk_market_status');
     if (statusEl) {
       const open = typeof window.isMarketOpenForSymbol === 'function' ? window.isMarketOpenForSymbol('RELIANCE.NS') : false;
       statusEl.textContent = open ? 'Open' : 'Closed';
-      statusEl.className = 'bk-stat-val ' + (open ? 'positive' : 'negative');
+      statusEl.className = 'bk-meta-value ' + (open ? 'positive' : 'negative');
+    }
+
+    // Hero subtitle
+    const subtitleEl = document.getElementById('bk_hero_subtitle');
+    if (subtitleEl && qualifying.length > 0) {
+      subtitleEl.textContent = `${qualifying.length} Stocks near 52W High with Volume Breakout`;
     }
   };
 
-  const renderTable = (data) => {
-    const body = document.getElementById('bk_scanner_body');
-    const matchCount = document.getElementById('bk_match_count');
-    if (!body) return;
+  const updateCategoryCards = () => {
+    const orb = _scanResults.filter(r => r.isORB && r.category !== 'Ignore').length;
+    const rs = _scanResults.filter(r => r.isHighRS && r.category !== 'Ignore').length;
+    const gap = _scanResults.filter(r => r.isGapUp && r.category !== 'Ignore').length;
+    const inside = _scanResults.filter(r => r.isInsideBar && r.category !== 'Ignore').length;
 
-    if (matchCount) matchCount.textContent = `${data.length} matches`;
+    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    el('bk_orb_count', orb);
+    el('bk_rs_count', rs);
+    el('bk_gap_count', gap);
+    el('bk_inside_count', inside);
+  };
+
+  // ── CARD RENDERING ──
+  const renderCards = (data) => {
+    const grid = document.getElementById('bk_stock_grid');
+    if (!grid) return;
 
     if (data.length === 0) {
-      body.innerHTML = `<tr class="bk-empty-row"><td colspan="11">
-        <div class="bk-empty-state">
-          <i class="ri-search-eye-line" style="font-size:2rem; color:var(--text-muted);"></i>
-          <p>No scanned assets match your filter criteria.</p>
-        </div>
-      </td></tr>`;
+      grid.innerHTML = `<div class="bk-empty-state" id="bk_empty_state">
+        <i class="bk-empty-icon ri-search-eye-line"></i>
+        <p>No breakout candidates match your criteria. Adjust filters or deploy a new scan.</p>
+      </div>`;
       return;
     }
 
-    body.innerHTML = data.map(r => {
-      const info = window.API.getStockInfo(r.symbol) || { name: r.symbol, sector: '—' };
-      const rowClass = r.category === 'Breakout King' ? 'king-row' : (r.category === 'Strong Breakout' ? 'strong-row' : '');
-      const catClass = r.category === 'Breakout King' ? 'king' : (r.category === 'Strong Breakout' ? 'strong' : 'watchlist');
-      
-      const scoreClass = r.score >= 85 ? 'high' : (r.score >= 55 ? 'mid' : 'low');
-      const volRatioClass = r.volRatio > 3 ? 'bk-vol-highlight' : '';
+    grid.innerHTML = data.map(r => {
+      const displaySym = r.symbol.replace('.NS', '').replace('.BO', '');
+      const positive = r.changePct >= 0;
+      const changeClass = positive ? 'positive' : 'negative';
+      const changeIcon = positive ? '▲' : '▼';
+      const changeSign = positive ? '+' : '';
 
-      return `<tr class="${rowClass}" data-symbol="${FMT.escHtml(r.symbol)}" style="cursor:pointer;">
-        <td>
-          <div style="font-weight:700; color:var(--accent-cyan); font-family:var(--font-mono);">${FMT.escHtml(r.symbol.replace('.NS','').replace('.BO',''))}</div>
-          <div style="font-size:0.65rem; color:var(--text-muted);">${FMT.escHtml(info.name)}</div>
-        </td>
-        <td class="mono" style="text-align:right; font-weight:600;">₹${FMT.price(r.price)}</td>
-        <td class="mono" style="text-align:right; color:var(--text-secondary);">₹${FMT.price(r.high50d)}</td>
-        <td class="mono" style="text-align:right; color:var(--text-secondary);">₹${FMT.price(r.high52w)}</td>
-        <td class="mono ${volRatioClass}" style="text-align:right;">${r.volRatio.toFixed(2)}x</td>
-        <td class="mono" style="text-align:right;">${r.rsi != null ? r.rsi.toFixed(1) : '—'}</td>
-        <td class="mono" style="text-align:right;">${r.adx != null ? r.adx.toFixed(1) : '—'}</td>
-        <td class="mono" style="text-align:right; color:${r.rsScore >= 0 ? 'var(--color-positive)' : 'var(--color-negative)'};">
-          ${r.rsScore >= 0 ? '+' : ''}${r.rsScore.toFixed(2)}%
-        </td>
-        <td style="text-align:right;">
-          <span class="bk-score-badge ${scoreClass}">${r.score}/100</span>
-        </td>
-        <td style="text-align:center;">
-          <span class="bk-cat-badge ${catClass}">${r.category}</span>
-        </td>
-        <td class="mono" style="text-align:right; color:var(--text-secondary); font-size:0.7rem;">
-          ${new Date(r.timestamp).toLocaleTimeString()}
-        </td>
-      </tr>`;
+      // Card variant class
+      let cardClass = 'watchlist-card';
+      let badgeClass = 'watchlist';
+      let barClass = 'watchlist-bar';
+      let numClass = 'watchlist-num';
+      let badgeText = 'WATCHLIST';
+      if (r.category === 'Breakout King') {
+        cardClass = 'king-card'; badgeClass = 'king'; barClass = 'king-bar'; numClass = 'king-num'; badgeText = '👑 BREAKOUT KING';
+      } else if (r.category === 'Strong') {
+        cardClass = 'strong-card'; badgeClass = 'strong'; barClass = 'strong-bar'; numClass = 'strong-num'; badgeText = 'STRONG';
+      }
+
+      const volFormatted = formatVolume(r.volume);
+      const sparkId = `spark_${displaySym.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+      return `<div class="bk-stock-card ${cardClass}" data-symbol="${escHtml(r.symbol)}">
+        <div class="bk-card-header">
+          <div class="bk-card-identity">
+            <span class="bk-card-symbol">${escHtml(displaySym)}</span>
+            <span class="bk-card-name">${escHtml(displaySym)}</span>
+            <span class="bk-card-exchange">${r.exchange}</span>
+          </div>
+          <span class="bk-strength-badge ${badgeClass}">${badgeText}</span>
+        </div>
+
+        <div class="bk-card-price-row">
+          <span class="bk-card-price">₹${r.price.toFixed(2)}</span>
+          <span class="bk-card-change ${changeClass}">${changeIcon} ${changeSign}${r.changePct.toFixed(2)}%</span>
+        </div>
+
+        <div class="bk-card-score-row">
+          <span class="bk-card-score-label">Score</span>
+          <div class="bk-card-score-bar-wrap">
+            <div class="bk-card-score-bar ${barClass}" style="width:${r.score}%;"></div>
+          </div>
+          <span class="bk-card-score-num ${numClass}">${r.score}</span>
+        </div>
+
+        <canvas class="bk-card-sparkline" id="${sparkId}" width="340" height="36"></canvas>
+
+        <div class="bk-card-metrics">
+          <div class="bk-card-metric">
+            <span class="bk-card-metric-label">Volume</span>
+            <span class="bk-card-metric-value">${volFormatted}</span>
+          </div>
+          <div class="bk-card-metric">
+            <span class="bk-card-metric-label">Day High</span>
+            <span class="bk-card-metric-value">₹${r.high.toFixed(2)}</span>
+          </div>
+          <div class="bk-card-metric">
+            <span class="bk-card-metric-label">Day Low</span>
+            <span class="bk-card-metric-value">₹${r.low.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div class="bk-card-insight">
+          <i>💡</i> ${escHtml(r.reason)}
+        </div>
+      </div>`;
     }).join('');
 
-    // Attach click events
-    body.querySelectorAll('tr[data-symbol]').forEach(row => {
-      row.addEventListener('click', () => {
+    // Draw sparklines after DOM is rendered
+    requestAnimationFrame(() => {
+      data.forEach(r => {
+        const displaySym = r.symbol.replace('.NS', '').replace('.BO', '');
+        const sparkId = `spark_${displaySym.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const canvas = document.getElementById(sparkId);
+        if (canvas && r.sparkline && r.sparkline.length > 1) {
+          drawSparkline(canvas, r.sparkline, r.changePct >= 0);
+        }
+      });
+    });
+
+    // Click-to-open modal
+    grid.querySelectorAll('.bk-stock-card[data-symbol]').forEach(card => {
+      card.addEventListener('click', () => {
         if (window.AppState && typeof window.AppState.openStockModal === 'function') {
-          window.AppState.openStockModal(row.dataset.symbol);
+          window.AppState.openStockModal(card.dataset.symbol);
         }
       });
     });
   };
 
-  const getStats = () => {
-    return {
-      total: _scanResults.length,
-      kings: _scanResults.filter(r => r.category === 'Breakout King').length,
-      strong: _scanResults.filter(r => r.category === 'Strong Breakout').length,
-      watchlist: _scanResults.filter(r => r.category === 'Watchlist').length
-    };
+  // ── SPARKLINE DRAWER ──
+  const drawSparkline = (canvas, data, isPositive) => {
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    const padding = 2;
+
+    const points = data.map((v, i) => ({
+      x: padding + (i / (data.length - 1)) * (w - 2 * padding),
+      y: padding + (1 - (v - min) / range) * (h - 2 * padding)
+    }));
+
+    // Fill gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, h);
+    if (isPositive) {
+      gradient.addColorStop(0, 'rgba(0, 217, 126, 0.15)');
+      gradient.addColorStop(1, 'rgba(0, 217, 126, 0.0)');
+    } else {
+      gradient.addColorStop(0, 'rgba(255, 71, 87, 0.15)');
+      gradient.addColorStop(1, 'rgba(255, 71, 87, 0.0)');
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, h);
+    points.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(points[points.length - 1].x, h);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    points.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.strokeStyle = isPositive ? '#00d97e' : '#ff4757';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Dot on last point
+    const last = points[points.length - 1];
+    ctx.beginPath();
+    ctx.arc(last.x, last.y, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = isPositive ? '#00d97e' : '#ff4757';
+    ctx.fill();
   };
+
+  // ── HELPERS ──
+  const formatVolume = (vol) => {
+    if (vol >= 10000000) return (vol / 10000000).toFixed(1) + ' Cr';
+    if (vol >= 100000) return (vol / 100000).toFixed(1) + ' L';
+    if (vol >= 1000) return (vol / 1000).toFixed(1) + 'K';
+    return vol.toString();
+  };
+
+  const escHtml = (str) => {
+    if (typeof FMT !== 'undefined' && FMT.escHtml) return FMT.escHtml(str);
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  };
+
+  const getStats = () => ({
+    total: _scanResults.filter(r => r.category !== 'Ignore').length,
+    kings: _scanResults.filter(r => r.category === 'Breakout King').length,
+    strong: _scanResults.filter(r => r.category === 'Strong').length,
+    watchlist: _scanResults.filter(r => r.category === 'Watchlist').length
+  });
 
   return {
     init,
