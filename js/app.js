@@ -58,6 +58,7 @@ const AppState = (() => {
     watchlist: { title: 'My Watchlist',                   subtitle: 'Your tracked stocks across all segments', module: 'Watchlist' },
     screener:  { title: 'Stock Screener',                 subtitle: 'Filter stocks by fundamentals and price',  module: 'Screener' },
     scanner:   { title: 'Technical Intelligence Scanner', subtitle: 'NSE technical breakout setups & confluence signals', module: 'Scanner' },
+    'breakout-kings': { title: 'Breakout Kings Scanner',   subtitle: 'Identify high-momentum breakout candidates (Score ≥85)', module: 'BreakoutKings' },
     'diagnostics/market-feed': { title: 'Market Feed Diagnostics', subtitle: 'Real-time feed analytics and network stats', module: 'Diagnostics' },
     test:      { title: 'Indicator Testbed Sandbox',      subtitle: 'Isolated advanced analysis and indicators', module: 'TestTab' },
   };
@@ -69,6 +70,11 @@ const AppState = (() => {
     // If transitioning away from 'test', call its destroy to clean up intervals
     if (_currentSegment === 'test' && window.TestTab && typeof window.TestTab.destroy === 'function') {
       try { window.TestTab.destroy(); } catch (e) { console.warn('[Samadhan] TestTab.destroy error:', e); }
+    }
+
+    // If transitioning away from 'breakout-kings', stop scanning
+    if (_currentSegment === 'breakout-kings' && window.BreakoutKings && typeof window.BreakoutKings.destroy === 'function') {
+      try { window.BreakoutKings.destroy(); } catch (e) { console.warn('[Samadhan] BreakoutKings.destroy error:', e); }
     }
     
     _currentSegment = segment;

@@ -32,6 +32,7 @@
   <!-- ApexCharts & Scanner Styles -->
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <link rel="stylesheet" href="scanner/scanner.css" />
+  <link rel="stylesheet" href="css/breakout_kings.css" />
 </head>
 <body>
 
@@ -96,6 +97,11 @@
           <i class="ri-copper-coin-fill nav-icon"></i>
           <span class="nav-label">Commodities</span>
           <span class="nav-badge" id="badge-commodity">Live</span>
+        </a>
+        <a href="#breakout-kings" class="nav-item" data-segment="breakout-kings" id="nav-breakout-kings">
+          <i class="ri-fire-fill nav-icon"></i>
+          <span class="nav-label">Breakout Kings</span>
+          <span class="nav-badge pro">Scanner</span>
         </a>
 
         <div class="nav-section-label">Investments</div>
@@ -1182,6 +1188,234 @@
           </div>
         </section>
 
+        <!-- BREAKOUT KINGS SCANNER SECTION -->
+        <section id="section-breakout-kings" class="content-section" aria-label="Breakout Kings Scanner" hidden>
+          <!-- Stats Ribbon / KPI Dashboard -->
+          <div class="bk-stats-ribbon">
+            <div class="bk-stat-card">
+              <span class="bk-stat-label">Total Scanned</span>
+              <span class="bk-stat-val mono" id="bk-total-scanned">0</span>
+            </div>
+            <div class="bk-stat-card king">
+              <span class="bk-stat-label">Breakout Kings</span>
+              <span class="bk-stat-val mono" id="bk-kings-count">0</span>
+            </div>
+            <div class="bk-stat-card strong">
+              <span class="bk-stat-label">Strong Breakouts</span>
+              <span class="bk-stat-val mono" id="bk-strong-count">0</span>
+            </div>
+            <div class="bk-stat-card watchlist">
+              <span class="bk-stat-label">Watchlist Candidates</span>
+              <span class="bk-stat-val mono" id="bk-watchlist-count">0</span>
+            </div>
+            <div class="bk-stat-card status">
+              <span class="bk-stat-label">Market Status</span>
+              <span class="bk-stat-val" id="bk-market-status">--</span>
+            </div>
+          </div>
+
+          <div class="bk-layout-grid">
+            <!-- Left Side: Controls & Alerts Config -->
+            <div class="bk-sidebar-panel">
+              <!-- Scanner Setup Card -->
+              <div class="glass-card bk-panel-card">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="ri-settings-4-fill"></i> Scanner Control Panel</h3>
+                </div>
+                <div class="bk-panel-body">
+                  <div class="bk-ctrl-group">
+                    <label for="bk_market_select">Target Market</label>
+                    <select id="bk_market_select">
+                      <option value="all" selected>All (NSE & BSE)</option>
+                      <option value="nse">NSE Equities</option>
+                      <option value="bse">BSE Equities</option>
+                    </select>
+                  </div>
+                  <div class="bk-ctrl-group">
+                    <label for="bk_sector_select">Sector Scope</label>
+                    <select id="bk_sector_select">
+                      <option value="all" selected>All Sectors</option>
+                    </select>
+                  </div>
+                  <div class="bk-ctrl-group">
+                    <label for="bk_concurrency">Scan Concurrency</label>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <input type="range" id="bk_concurrency" min="1" max="20" value="10" style="flex-grow:1;" />
+                      <span id="bk_concurrency_val" class="mono" style="font-weight:700; width:20px; text-align:right;">10</span>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:8px; margin-top:16px;">
+                    <button class="btn btn-success" id="bk_deploy_btn" style="flex-grow:1;">
+                      <i class="ri-play-fill"></i> Deploy Scan
+                    </button>
+                    <button class="btn btn-danger" id="bk_stop_btn" style="display:none; flex-grow:1;">
+                      <i class="ri-stop-fill"></i> Stop Scan
+                    </button>
+                  </div>
+                  
+                  <!-- Scan Progress Card -->
+                  <div id="bk_progress_wrapper" style="margin-top:16px; display:none;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.75rem;">
+                      <span id="bk_progress_status" style="color:var(--text-secondary);">Scanning stocks...</span>
+                      <span id="bk_progress_numbers" class="mono" style="font-weight:700;">0 / 0</span>
+                    </div>
+                    <div class="bk-progress-bar">
+                      <div class="bk-progress-fill" id="bk_progress_fill"></div>
+                    </div>
+                    <div class="bk-progress-logs" id="bk_progress_logs"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Alerts & Notification Channels Card -->
+              <div class="glass-card bk-panel-card">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="ri-notification-badge-fill"></i> Alert Channels</h3>
+                </div>
+                <div class="bk-panel-body">
+                  <div class="bk-alert-toggle-group">
+                    <label class="bk-switch-label">
+                      <input type="checkbox" id="bk_alert_inapp" checked />
+                      <span>In-App Toasts & Panel</span>
+                    </label>
+                    <label class="bk-switch-label">
+                      <input type="checkbox" id="bk_alert_telegram" />
+                      <span>Telegram Notifications</span>
+                    </label>
+                    <label class="bk-switch-label">
+                      <input type="checkbox" id="bk_alert_email" />
+                      <span>Email Delivery</span>
+                    </label>
+                    <label class="bk-switch-label">
+                      <input type="checkbox" id="bk_alert_push" />
+                      <span>Browser Push</span>
+                    </label>
+                  </div>
+
+                  <div id="bk_telegram_config" style="margin-top:12px; display:none; flex-direction:column; gap:8px;">
+                    <input type="text" id="bk_tg_token" class="text-input" placeholder="Telegram Bot Token" />
+                    <input type="text" id="bk_tg_chatid" class="text-input" placeholder="Telegram Chat ID" />
+                  </div>
+                  
+                  <div id="bk_email_config" style="margin-top:12px; display:none;">
+                    <input type="email" id="bk_email_address" class="text-input" placeholder="recipient@example.com" />
+                  </div>
+
+                  <!-- Alerts History Box -->
+                  <div style="margin-top:16px;">
+                    <h4 style="font-size:0.75rem; margin:0 0 8px 0; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center;">
+                      <span>Alerts Trigger Log</span>
+                      <button class="notif-clear-btn" id="bk_clear_alerts_btn" style="font-size:0.65rem;">Clear</button>
+                    </h4>
+                    <div class="bk-alerts-log" id="bk_alerts_log">
+                      <div class="bk-log-empty">No alerts triggered yet. Deploy scan to detect breakout setups.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Side: Data Table, Filters & Exporters -->
+            <div class="bk-main-panel">
+              <div class="glass-card bk-table-card">
+                <div class="card-header" style="flex-wrap:wrap; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <h3 class="card-title"><i class="ri-table-fill"></i> Breakout Scan Results</h3>
+                    <span id="bk_match_count" class="segment-badge" style="font-size:0.7rem; background:rgba(255,255,255,0.05); color:var(--text-secondary);">0 matches</span>
+                  </div>
+                  
+                  <div class="bk-export-group">
+                    <button class="btn btn-sm btn-ghost" id="bk_export_csv"><i class="ri-file-text-line"></i> CSV</button>
+                    <button class="btn btn-sm btn-ghost" id="bk_export_excel"><i class="ri-file-excel-line"></i> Excel</button>
+                    <button class="btn btn-sm btn-ghost" id="bk_export_pdf"><i class="ri-printer-line"></i> PDF Report</button>
+                  </div>
+                </div>
+
+                <!-- Live Result Filters Panel -->
+                <div class="bk-filters-grid">
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_category">Category</label>
+                    <select id="bk_f_category">
+                      <option value="all" selected>All Categories</option>
+                      <option value="king">Breakout Kings (Score >=85)</option>
+                      <option value="strong">Strong Breakouts (70-84)</option>
+                      <option value="watchlist">Watchlist (55-69)</option>
+                    </select>
+                  </div>
+                  
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_score_min">Min Score</label>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <input type="range" id="bk_f_score_min" min="0" max="100" value="0" style="flex-grow:1;" />
+                      <span id="bk_f_score_min_val" class="mono" style="font-size:0.7rem; font-weight:700; width:20px; text-align:right;">0</span>
+                    </div>
+                  </div>
+
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_rsi_min">RSI Filter</label>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <input type="range" id="bk_f_rsi_min" min="0" max="100" value="0" style="flex-grow:1;" />
+                      <span id="bk_f_rsi_min_val" class="mono" style="font-size:0.7rem; font-weight:700; width:20px; text-align:right;">0</span>
+                    </div>
+                  </div>
+
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_adx_min">Min ADX</label>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <input type="range" id="bk_f_adx_min" min="0" max="100" value="0" style="flex-grow:1;" />
+                      <span id="bk_f_adx_min_val" class="mono" style="font-size:0.7rem; font-weight:700; width:20px; text-align:right;">0</span>
+                    </div>
+                  </div>
+
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_vol_ratio">Min Vol Ratio</label>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <input type="range" id="bk_f_vol_ratio" min="0" max="10" step="0.5" value="0" style="flex-grow:1;" />
+                      <span id="bk_f_vol_ratio_val" class="mono" style="font-size:0.7rem; font-weight:700; width:25px; text-align:right;">0.0</span>
+                    </div>
+                  </div>
+                  
+                  <div class="bk-filter-cell">
+                    <label for="bk_f_price_min">Min Price (₹)</label>
+                    <input type="number" id="bk_f_price_min" class="text-input" placeholder="₹100" style="padding:4px 8px; font-size:0.75rem; border-radius:4px; background:var(--bg-3); border:1px solid var(--border-primary); color:var(--text-primary);" />
+                  </div>
+                </div>
+
+                <!-- Scanned Datatable -->
+                <div class="bk-table-wrapper">
+                  <table class="bk-table" id="bk_scanner_table">
+                    <thead>
+                      <tr>
+                        <th style="text-align:left;">Asset Info</th>
+                        <th data-sort="price" style="text-align:right; cursor:pointer;">Price <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="high50d" style="text-align:right; cursor:pointer;">50D High <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="high52w" style="text-align:right; cursor:pointer;">52W High <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="volRatio" style="text-align:right; cursor:pointer;">Vol Ratio <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="rsi" style="text-align:right; cursor:pointer;">RSI <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="adx" style="text-align:right; cursor:pointer;">ADX <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="rsScore" style="text-align:right; cursor:pointer;">RS Score <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th data-sort="score" style="text-align:right; cursor:pointer;">Score <i class="ri-arrow-up-down-line" style="font-size:0.65rem;"></i></th>
+                        <th style="text-align:center;">Category</th>
+                        <th style="text-align:right;">Last Scanned</th>
+                      </tr>
+                    </thead>
+                    <tbody id="bk_scanner_body">
+                      <tr class="bk-empty-row">
+                        <td colspan="11">
+                          <div class="bk-empty-state">
+                            <i class="ri-radar-line" style="font-size:2rem; color:var(--text-muted);"></i>
+                            <p>No scanned assets found. Configure parameters and click "Deploy Scan" to start scanning NSE/BSE stocks.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main><!-- /content-area -->
     </div><!-- /main-wrapper -->
   </div><!-- /app-shell -->
@@ -1327,7 +1561,12 @@
   <script src="js/test_tab/components/search.js"></script>
   <script src="js/test_tab/components/details.js"></script>
   <script src="js/test_tab/components/charts.js"></script>
-  <script src="js/test_tab/test_tab.js"></script>
+  <!-- BREAKOUT KINGS SCANNER SCRIPTS -->
+  <script src="js/breakout_kings/exports.js"></script>
+  <script src="js/breakout_kings/alerts.js"></script>
+  <script src="js/breakout_kings/scanner.js"></script>
+  <script src="js/breakout_kings/ui.js"></script>
+  <script src="js/breakout_kings/breakout_kings.js"></script>
   <script src="js/app.js?v=1.0.1"></script>
 </body>
 </html>
