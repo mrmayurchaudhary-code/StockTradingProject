@@ -201,5 +201,7 @@ const Watchlist = (() => {
     });
   };
 
-  return { init, refresh, addSymbol, removeSymbol, has };
+  const getSymbols = () => _symbols;
+
+  return { init, refresh, addSymbol, removeSymbol, has, getSymbols };
 })();

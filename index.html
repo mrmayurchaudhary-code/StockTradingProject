@@ -80,13 +80,25 @@
         <a href="#nse" class="nav-item" data-segment="nse" id="nav-nse">
           <i class="ri-bar-chart-grouped-fill nav-icon"></i>
           <span class="nav-label">NSE</span>
-          <span class="nav-badge">Live</span>
+          <span class="nav-badge" id="badge-nse">Live</span>
         </a>
         <a href="#bse" class="nav-item" data-segment="bse" id="nav-bse">
           <i class="ri-stock-fill nav-icon"></i>
           <span class="nav-label">BSE</span>
-          <span class="nav-badge">Live</span>
+          <span class="nav-badge" id="badge-bse">Live</span>
         </a>
+        <a href="#crypto" class="nav-item" data-segment="crypto" id="nav-crypto">
+          <i class="ri-coins-fill nav-icon"></i>
+          <span class="nav-label">Crypto</span>
+          <span class="nav-badge" id="badge-crypto">Live</span>
+        </a>
+        <a href="#commodity" class="nav-item" data-segment="commodity" id="nav-commodity">
+          <i class="ri-copper-coin-fill nav-icon"></i>
+          <span class="nav-label">Commodities</span>
+          <span class="nav-badge" id="badge-commodity">Live</span>
+        </a>
+
+        <div class="nav-section-label">Investments</div>
         <a href="#etf" class="nav-item" data-segment="etf" id="nav-etf">
           <i class="ri-funds-fill nav-icon"></i>
           <span class="nav-label">ETF</span>
@@ -101,10 +113,6 @@
           <i class="ri-exchange-fill nav-icon"></i>
           <span class="nav-label">F&amp;O</span>
           <span class="nav-badge pro">Pro</span>
-        </a>
-        <a href="#commodity" class="nav-item" data-segment="commodity" id="nav-commodity">
-          <i class="ri-copper-coin-fill nav-icon"></i>
-          <span class="nav-label">Commodities</span>
         </a>
         <a href="#currency" class="nav-item" data-segment="currency" id="nav-currency">
           <i class="ri-currency-fill nav-icon"></i>
@@ -126,6 +134,16 @@
           <span class="nav-label">Scanner</span>
           <span class="nav-badge pro">Signals</span>
         </a>
+        <a href="#diagnostics/market-feed" class="nav-item" data-segment="diagnostics/market-feed" id="nav-diagnostics">
+          <i class="ri-pulse-fill nav-icon"></i>
+          <span class="nav-label">Diagnostics</span>
+          <span class="nav-badge" style="background:var(--color-positive-dim); color:var(--color-positive); border-color:rgba(0, 217, 126, 0.2)">Feed</span>
+        </a>
+        <a href="#test" class="nav-item" data-segment="test" id="nav-test" style="font-weight: bold;">
+          <i class="ri-flask-fill nav-icon" style="font-weight: bold;"></i>
+          <span class="nav-label"><b>Test</b></span>
+          <span class="nav-badge" style="background:var(--accent-purple-dim); color:var(--accent-purple); border-color:rgba(187, 134, 252, 0.2); font-weight: normal;">Sandbox</span>
+        </a>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -134,9 +152,9 @@
           <i class="ri-database-2-fill"></i>
           <span id="dataSourceText">Groww API</span>
         </div>
-        <div class="refresh-timer" id="refreshTimer">
-          <i class="ri-refresh-line"></i>
-          <span id="refreshCountdown">30s</span>
+        <div class="refresh-timer" id="refreshTimer" style="display:flex;align-items:center;gap:6px">
+          <span class="pulse-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#00d97e;box-shadow:0 0 8px #00d97e;animation:pulse 1.5s infinite"></span>
+          <span id="refreshCountdown" style="font-family:monospace;font-weight:700">1000ms</span>
         </div>
       </div>
     </aside>
@@ -167,13 +185,37 @@
             <span class="index-value" id="headerSensex">--</span>
             <span class="index-change" id="headerSensexChange">--</span>
           </div>
-          <button class="icon-btn" id="themeToggle" aria-label="Toggle theme">
-            <i class="ri-sun-fill"></i>
-          </button>
-          <button class="icon-btn notification-btn" id="notificationBtn" aria-label="Notifications">
-            <i class="ri-notification-3-fill"></i>
-            <span class="notif-badge">3</span>
-          </button>
+          <div class="theme-wrapper" style="position: relative; display: flex; align-items: center;">
+            <button class="icon-btn" id="themeToggle" aria-label="Toggle theme">
+              <i class="ri-sun-fill"></i>
+            </button>
+            <div class="theme-dropdown" id="themeDropdown">
+              <button class="theme-opt-btn" data-theme="light">
+                <i class="ri-sun-fill" style="color: var(--accent-gold);"></i> Day Mode
+              </button>
+              <button class="theme-opt-btn" data-theme="dark">
+                <i class="ri-moon-fill" style="color: var(--accent-purple);"></i> Night Mode
+              </button>
+              <button class="theme-opt-btn" data-theme="auto">
+                <i class="ri-contrast-2-line" style="color: var(--accent-cyan);"></i> Auto Theme
+              </button>
+            </div>
+          </div>
+          <div class="notification-wrapper" style="position: relative; display: flex; align-items: center;">
+            <button class="icon-btn notification-btn" id="notificationBtn" aria-label="Notifications">
+              <i class="ri-notification-3-fill"></i>
+              <span class="notif-badge" id="notifBadge">3</span>
+            </button>
+            <div class="notification-dropdown" id="notificationDropdown">
+              <div class="notif-header">
+                <h3>Notifications</h3>
+                <button class="notif-clear-btn" id="clearNotifBtn">Clear All</button>
+              </div>
+              <div class="notif-list" id="notifList">
+                <!-- Dynamic notifications -->
+              </div>
+            </div>
+          </div>
           <div class="user-avatar" id="userAvatar" role="button" aria-label="User profile" tabindex="0">
             <span>ST</span>
           </div>
@@ -306,6 +348,31 @@
                 <div class="empty-state">
                   <i class="ri-stock-fill"></i>
                   <p>Select a stock to view details</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CRYPTO SECTION -->
+        <section id="section-crypto" class="content-section" aria-label="Crypto Coins" hidden>
+          <div class="segment-layout">
+            <div class="segment-sidebar">
+              <div class="glass-card">
+                <div class="card-header">
+                  <h2 class="card-title"><i class="ri-coins-line"></i> Crypto Coins</h2>
+                </div>
+                <div class="stock-search-container">
+                  <input type="text" id="cryptoSearch" class="segment-search" placeholder="Search crypto..." maxlength="30" aria-label="Search Crypto" />
+                </div>
+                <div class="stock-list" id="cryptoCoinList"><!-- populated --></div>
+              </div>
+            </div>
+            <div class="segment-main" id="cryptoMain">
+              <div class="glass-card stock-detail-card" id="cryptoDetail">
+                <div class="empty-state">
+                  <i class="ri-coins-line"></i>
+                  <p>Select a coin to view details</p>
                 </div>
               </div>
             </div>
@@ -788,6 +855,333 @@
           </div>
         </section>
 
+        <!-- DIAGNOSTICS SECTION -->
+        <section id="section-diagnostics-market-feed" class="content-section" aria-label="Market Feed Diagnostics" hidden>
+          <div class="glass-card" style="padding: 24px; margin-bottom: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h2 style="font-family:var(--font-display); font-size:1.4rem; font-weight:700; color:var(--text-primary); margin:0;">
+                  <i class="ri-pulse-fill" style="color:var(--accent-cyan)"></i> Real-Time Feed Diagnostics
+                </h2>
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">
+                  Monitoring live market quote feeds, data providers, and system latencies.
+                </p>
+              </div>
+              <div class="data-source-badge" style="padding:6px 14px; font-size:0.75rem; display:flex; align-items:center;">
+                <span class="pulse-dot" style="background:var(--color-positive); box-shadow:0 0 8px var(--color-positive); width:8px; height:8px; border-radius:50%; display:inline-block;"></span>
+                <span style="font-weight:700; color:var(--text-primary); margin-left:6px;" id="diag_active_provider">Checking...</span>
+              </div>
+            </div>
+
+            <!-- Diagnostics Metrics Grid -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Active Provider</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--accent-cyan);" id="diag_provider">--</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Connection Type</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--text-primary);" id="diag_conn_type">REST Polling (1s)</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">WebSocket Status</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--color-neutral);" id="diag_ws_status">INACTIVE</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Polling Status</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--color-positive);" id="diag_polling_status">ACTIVE</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Feed Health</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--color-positive);" id="diag_feed_health">100% HEALTHY</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Tick Rate</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--accent-purple);" id="diag_tick_rate">4.0 ticks/s</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Current Latency</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--accent-gold);" id="diag_latency">-- ms</span>
+              </div>
+              <div class="glass-card" style="padding: 16px; display:flex; flex-direction:column; gap:4px; border:1px solid var(--border-primary);">
+                <span style="font-size:0.72rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:1px;">Last Tick Time</span>
+                <span style="font-size:1.25rem; font-weight:700; color:var(--text-primary);" id="diag_last_tick">--</span>
+              </div>
+            </div>
+
+            <!-- Latency Visualizer & Active Tickers -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+              <div class="glass-card" style="padding: 16px; border:1px solid var(--border-primary);">
+                <div class="card-header" style="margin-bottom: 12px;">
+                  <h3 class="card-title" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0;"><i class="ri-bar-chart-2-fill"></i> Feed Latency Log (Last 10 updates)</h3>
+                </div>
+                <div style="display:flex; align-items:flex-end; justify-content:space-between; height: 160px; padding:10px 20px; background:rgba(0,0,0,0.15); border-radius: var(--radius-md);" id="diag_latency_chart">
+                  <!-- Dynamic latency bars -->
+                </div>
+              </div>
+
+              <div class="glass-card" style="padding: 16px; border:1px solid var(--border-primary);">
+                <div class="card-header" style="margin-bottom: 12px;">
+                  <h3 class="card-title" style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0;"><i class="ri-list-check"></i> High-Frequency Monitored Symbols</h3>
+                </div>
+                <div class="data-table-wrapper" style="max-height: 160px; overflow-y: auto;">
+                  <table class="data-table" style="font-size: 0.75rem; width:100%; border-collapse: collapse;">
+                    <thead>
+                      <tr style="text-align:left; border-bottom: 1px solid var(--border-primary);">
+                        <th style="padding:6px 8px;">Symbol</th>
+                        <th style="padding:6px 8px;">LTP</th>
+                        <th style="padding:6px 8px;">Tick Change</th>
+                        <th style="padding:6px 8px;">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody id="diag_monitored_table">
+                      <!-- Dynamic list of visible items -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TEST SANDBOX SECTION -->
+        <section id="section-test" class="content-section" aria-label="Indicator Testbed Sandbox" hidden>
+          <div class="glass-card" style="padding: 24px; margin-bottom: 20px;">
+            <h2 style="font-family:var(--font-display); font-size:1.4rem; font-weight:700; color:var(--text-primary); margin:0 0 4px 0;">
+              <i class="ri-flask-fill" style="color:var(--accent-purple)"></i> Indicator Testbed Sandbox
+            </h2>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom: 16px;">
+              Analyze assets using advanced technical indicators and order flows (EMA, RSI, MACD, support/resistance, and options metrics).
+            </p>
+
+            <!-- Universal Search bar -->
+            <div style="position:relative; width:100%; max-width:600px;">
+              <div class="search-container" style="display:flex; align-items:center; background:var(--bg-card); border:1px solid var(--border-primary); border-radius: var(--radius-md); padding: 4px 12px; width:100%;">
+                <i class="ri-search-line" style="color:var(--text-muted); font-size:1.1rem; margin-right:8px;"></i>
+                <input type="text" id="testSearchInput" placeholder="Search NSE, BSE stocks, Crypto, Commodities..." style="background:transparent; border:none; outline:none; color:var(--text-primary); width:100%; font-size:0.9rem; padding:8px 0;" autocomplete="off">
+                <button id="testSearchClearBtn" style="background:transparent; border:none; color:var(--text-muted); cursor:pointer; display:none;"><i class="ri-close-line"></i></button>
+              </div>
+              <!-- Suggestions dropdown -->
+              <div id="testSearchResults" class="search-results-dropdown" style="position:absolute; top:100%; left:0; right:0; margin-top:4px; z-index:100;"></div>
+            </div>
+          </div>
+
+          <!-- Main Sandbox Display -->
+          <div id="testSandboxContent">
+            <!-- Show this when no asset is loaded -->
+            <div id="testEmptyState" class="glass-card" style="padding: 48px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; justify-content:center;">
+              <i class="ri-search-eye-line" style="font-size:3rem; color:var(--text-muted); opacity:0.5;"></i>
+              <h3 style="margin:0; font-size:1.1rem; color:var(--text-primary);">No Asset Selected</h3>
+              <p style="margin:0; font-size:0.8rem; color:var(--text-muted); max-width:320px;">
+                Use the search bar above to select a stock, cryptocurrency, or commodity to load the real-time technical analysis dashboard.
+              </p>
+            </div>
+
+            <!-- Active Asset Workspace -->
+            <div id="testAssetWorkspace" style="display:none;">
+              <!-- Grid layout for Asset Stats & Chart -->
+              <div style="display:grid; grid-template-columns: 1fr; gap:20px; margin-bottom:20px;">
+                <!-- Asset Header & Quick Info -->
+                <div class="glass-card" style="padding:20px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                    <div>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <h3 id="testAssetTicker" style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:var(--accent-cyan); margin:0;">--</h3>
+                        <span id="testAssetExchangeBadge" class="segment-badge badge-nse">--</span>
+                      </div>
+                      <p id="testAssetName" style="font-size:0.9rem; color:var(--text-secondary); margin:4px 0 0 0;">--</p>
+                    </div>
+                    <div style="text-align:right;">
+                      <div id="testAssetLtp" style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:var(--text-primary);">--</div>
+                      <div id="testAssetChange" style="font-size:0.85rem; margin-top:2px;">--</div>
+                    </div>
+                  </div>
+
+                  <!-- Stats Grid -->
+                  <div id="testAssetStats" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; border-top: 1px solid var(--border-primary); padding-top:16px;">
+                    <!-- stats columns render here -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Main Chart Card -->
+              <div class="glass-card" style="padding:20px; margin-bottom:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+                  <h3 style="font-size:0.95rem; font-weight:700; color:var(--text-primary); margin:0;"><i class="ri-line-chart-fill"></i> Technical Analysis Chart</h3>
+                  <!-- Time Range Selector -->
+                  <div style="display:flex; gap:4px;" id="testChartRanges">
+                    <button class="time-btn active" data-range="1d">1D</button>
+                    <button class="time-btn" data-range="5d">5D</button>
+                    <button class="time-btn" data-range="1mo">1M</button>
+                    <button class="time-btn" data-range="3mo">3M</button>
+                    <button class="time-btn" data-range="1y">1Y</button>
+                  </div>
+                </div>
+                <div id="testChartContainer" style="height:360px; position:relative; background:rgba(0,0,0,0.1); border-radius:var(--radius-md);">
+                  <!-- TradingView Lightweight Chart renders here -->
+                </div>
+              </div>
+
+              <!-- Indicators Sandbox Section -->
+              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+                <!-- Trend Indicators Card -->
+                <div class="glass-card" style="padding:16px; border:1px solid var(--border-primary);">
+                  <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0 0 12px 0; display:flex; align-items:center; gap:6px;">
+                    <i class="ri-line-chart-line" style="color:var(--accent-purple)"></i> Trend Indicators (EMA & VWAP)
+                  </h4>
+                  <div style="display:flex; flex-direction:column; gap:10px;" id="testTrendIndicatorsContainer">
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm); flex-wrap:wrap; gap:8px;">
+                      <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">EMA</span>
+                          <div style="display:flex; gap:8px;">
+                            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                              <input type="checkbox" class="test-indicator-checkbox" data-indicator="ema20" checked style="accent-color:var(--accent-cyan); width:12px; height:12px;">
+                              <span style="font-size:0.65rem; color:var(--accent-cyan); font-weight:600;">20</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                              <input type="checkbox" class="test-indicator-checkbox" data-indicator="ema50" checked style="accent-color:var(--accent-purple); width:12px; height:12px;">
+                              <span style="font-size:0.65rem; color:var(--accent-purple); font-weight:600;">50</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                              <input type="checkbox" class="test-indicator-checkbox" data-indicator="ema200" checked style="accent-color:var(--accent-gold); width:12px; height:12px;">
+                              <span style="font-size:0.65rem; color:var(--accent-gold); font-weight:600;">200</span>
+                            </label>
+                          </div>
+                        </div>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Exponential Moving Averages</p>
+                      </div>
+                      <div style="display:flex; gap:8px;" id="testEmaValues">
+                        <span class="mono" style="font-size:0.75rem; color:var(--accent-cyan);">EMA20: --</span>
+                        <span class="mono" style="font-size:0.75rem; color:var(--accent-purple);">EMA50: --</span>
+                        <span class="mono" style="font-size:0.75rem; color:var(--accent-gold);">EMA200: --</span>
+                      </div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">VWAP</span>
+                          <input type="checkbox" class="test-indicator-checkbox" data-indicator="vwap" checked style="accent-color:var(--accent-cyan); width:12px; height:12px; cursor:pointer;">
+                        </div>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Volume Weighted Average Price</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--accent-cyan);" id="testVwapValue">--</div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                          <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">SuperTrend</span>
+                          <input type="checkbox" class="test-indicator-checkbox" data-indicator="supertrend" style="accent-color:var(--accent-purple); width:12px; height:12px; cursor:pointer;">
+                        </div>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Trend following volatility indicator</p>
+                      </div>
+                      <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="nav-badge" style="font-size:0.6rem; border-color:var(--border-accent); background:var(--bg-hover); color:var(--text-muted);" id="testSuperTrendValue">--</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Momentum Indicators Card -->
+                <div class="glass-card" style="padding:16px; border:1px solid var(--border-primary);">
+                  <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0 0 12px 0; display:flex; align-items:center; gap:6px;">
+                    <i class="ri-pulse-line" style="color:var(--accent-cyan)"></i> Oscillators (RSI, MACD, ADX)
+                  </h4>
+                  <div style="display:flex; flex-direction:column; gap:10px;" id="testOscillatorsContainer">
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">RSI (14)</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Relative Strength Index</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--text-primary);" id="testRsiValue">--</div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">MACD (12, 26, 9)</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Moving Average Convergence Divergence</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--text-primary);" id="testMacdValue">--</div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">ADX / DMI</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Average Directional Index</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--text-primary);" id="testAdxValue">--</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Volume & Volatility Card -->
+                <div class="glass-card" style="padding:16px; border:1px solid var(--border-primary);">
+                  <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0 0 12px 0; display:flex; align-items:center; gap:6px;">
+                    <i class="ri-bubble-chart-line" style="color:var(--accent-gold)"></i> Volume & Volatility (OBV, ATR, VP)
+                  </h4>
+                  <div style="display:flex; flex-direction:column; gap:10px;" id="testVolumeContainer">
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">On-Balance Volume (OBV)</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Cumulative volume flow indicator</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--text-primary);" id="testObvValue">--</div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">ATR (14)</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Average True Range (Volatility)</p>
+                      </div>
+                      <div class="mono" style="font-size:0.75rem; color:var(--text-primary);" id="testAtrValue">--</div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">Volume Profile</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Trading activity at specific price levels</p>
+                      </div>
+                      <span class="nav-badge" style="font-size:0.6rem; border-color:var(--border-accent); background:var(--bg-hover); color:var(--accent-gold);" id="testVolumeProfileStatus">Active</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Levels & Options Derivations Card -->
+                <div class="glass-card" style="padding:16px; border:1px solid var(--border-primary);">
+                  <h4 style="font-size:0.9rem; font-weight:700; color:var(--text-primary); margin:0 0 12px 0; display:flex; align-items:center; gap:6px;">
+                    <i class="ri-focus-3-line" style="color:var(--color-positive)"></i> Support, Resistance & F&amp;O Metrics
+                  </h4>
+                  <div style="display:flex; flex-direction:column; gap:10px;" id="testLevelsContainer">
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">Support / Resistance</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Pivot levels & key price zones</p>
+                      </div>
+                      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;" id="testSrLevels">
+                        <span class="mono" style="font-size:0.7rem; color:var(--color-positive);">S1: --</span>
+                        <span class="mono" style="font-size:0.7rem; color:var(--color-negative);">R1: --</span>
+                      </div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">PCR / Max Pain</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Put-Call Ratio & Option Max Pain</p>
+                      </div>
+                      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;" id="testFoMetrics">
+                        <span class="mono" style="font-size:0.7rem;">PCR: --</span>
+                        <span class="mono" style="font-size:0.7rem;">Max Pain: --</span>
+                      </div>
+                    </div>
+                    <div class="indicator-status-row" style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:var(--bg-hover); border-radius:var(--radius-sm);">
+                      <div>
+                        <span style="font-size:0.8rem; font-weight:700; color:var(--text-primary);">OI &amp; Long/Short Build-up</span>
+                        <p style="font-size:0.68rem; color:var(--text-muted); margin:2px 0 0 0;">Open Interest trend & market positioning</p>
+                      </div>
+                      <span class="nav-badge" style="font-size:0.6rem; border-color:var(--border-accent); background:var(--bg-hover); color:var(--accent-cyan);" id="testOiBuildUp">--</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main><!-- /content-area -->
     </div><!-- /main-wrapper -->
   </div><!-- /app-shell -->
@@ -844,7 +1238,61 @@
         </div>
         <div class="chart-container" id="modalChart" aria-label="Stock price chart"></div>
         <div class="modal-stats-grid" id="modalStats"></div>
-        <div class="modal-actions">
+        
+        <!-- DHAN EXTRAS (L3 MARKET DEPTH & EXPIRED OPTIONS) -->
+        <div class="modal-dhan-extras" id="modalDhanExtras" style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; border-top: 1px solid var(--border-primary); padding-top: 16px;">
+          <!-- Level 3 Market Depth -->
+          <div class="glass-card" style="padding: 14px; background: rgba(255,255,255,0.01);">
+            <div style="font-size: 0.8rem; font-weight: bold; color: var(--accent-cyan); margin-bottom: 12px; display:flex; align-items:center; gap:6px;">
+              <i class="ri-list-check" style="font-size:1rem"></i> Dhan Level 3 Depth (20 Levels)
+            </div>
+            <div class="market-depth-wrapper" style="font-size: 0.75rem;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <!-- Bids -->
+                <div>
+                  <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; color:var(--text-secondary); margin-bottom:6px; border-bottom:1px solid var(--border-primary); padding-bottom:4px; font-weight:600">
+                    <span>Bid Price</span><span>Qty</span><span>Orders</span>
+                  </div>
+                  <div id="modalBidsList" style="max-height: 180px; overflow-y: auto; display:flex; flex-direction:column; gap:4px;">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+                <!-- Asks -->
+                <div>
+                  <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; color:var(--text-secondary); margin-bottom:6px; border-bottom:1px solid var(--border-primary); padding-bottom:4px; font-weight:600">
+                    <span>Ask Price</span><span>Qty</span><span>Orders</span>
+                  </div>
+                  <div id="modalAsksList" style="max-height: 180px; overflow-y: auto; display:flex; flex-direction:column; gap:4px;">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-top:10px; border-top:1px solid var(--border-primary); padding-top:8px; font-weight:600; color:var(--text-secondary)">
+                <span>Total Buy Qty: <span id="modalTotalBuyQty" style="color:var(--color-positive)">-</span></span>
+                <span>Total Sell Qty: <span id="modalTotalSellQty" style="color:var(--color-negative)">-</span></span>
+              </div>
+            </div>
+          </div>
+          <!-- Expired Options / Rolling Data -->
+          <div class="glass-card" style="padding: 14px; background: rgba(255,255,255,0.01); display:flex; flex-direction:column;">
+            <div style="font-size: 0.8rem; font-weight: bold; color: var(--accent-gold); margin-bottom: 12px; display:flex; align-items:center; gap:6px;">
+              <i class="ri-history-line" style="font-size:1rem"></i> Dhan Rolling Options (Expired Candles)
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+              <select class="select-styled" id="expiredStrikeSelect" style="padding:4px 8px; font-size:0.75rem; width:120px; border-radius:4px; background:var(--bg-3); border:1px solid var(--border-primary); color:var(--text-primary);">
+                <option value="ATM">ATM Strike</option>
+                <option value="ATM+1">ATM + 1</option>
+                <option value="ATM-1">ATM - 1</option>
+                <option value="ATM+2">ATM + 2</option>
+                <option value="ATM-2">ATM - 2</option>
+              </select>
+              <button class="btn btn-ghost" id="loadExpiredBtn" style="padding:4px 10px; font-size:0.75rem; border-radius:4px;"><i class="ri-download-2-line"></i> Load</button>
+            </div>
+            <div class="chart-container" id="expiredOptionsChart" style="height:150px; flex-grow:1;" aria-label="Expired option chart"></div>
+          </div>
+        </div>
+
+        <div class="modal-actions" style="margin-top:16px;">
           <button class="btn btn-success" id="modalBuyBtn"><i class="ri-arrow-up-line"></i> Buy</button>
           <button class="btn btn-danger" id="modalSellBtn"><i class="ri-arrow-down-line"></i> Sell</button>
           <button class="btn btn-ghost" id="modalWatchBtn"><i class="ri-bookmark-line"></i> Watchlist</button>
@@ -864,12 +1312,22 @@
   <script src="js/screener.js"></script>
   <script src="js/segments/nse.js"></script>
   <script src="js/segments/bse.js"></script>
+  <script src="js/segments/crypto.js"></script>
   <script src="js/segments/etf.js"></script>
   <script src="js/segments/mf.js"></script>
   <script src="js/segments/fo.js"></script>
   <script src="js/segments/commodity.js"></script>
   <script src="js/segments/currency.js"></script>
   <script src="scanner/scanner.js"></script>
+  <script src="js/diagnostics.js"></script>
+  <!-- TEST SANDBOX SCRIPTS -->
+  <script src="js/test_tab/api/api.js"></script>
+  <script src="js/test_tab/state/state.js"></script>
+  <script src="js/test_tab/services/indicators.js"></script>
+  <script src="js/test_tab/components/search.js"></script>
+  <script src="js/test_tab/components/details.js"></script>
+  <script src="js/test_tab/components/charts.js"></script>
+  <script src="js/test_tab/test_tab.js"></script>
   <script src="js/app.js?v=1.0.1"></script>
 </body>
 </html>

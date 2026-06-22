@@ -141,6 +141,7 @@ const Dashboard = (() => {
       card.setAttribute('role', 'button');
       card.setAttribute('tabindex', '0');
       card.setAttribute('aria-label', `${idx.label}: ${FMT.price(q.price)}, ${FMT.pct(q.changePct)}`);
+      card.setAttribute('data-symbol', idx.symbol);
       card.innerHTML = `
         <div class="idx-name">${FMT.escHtml(idx.label)}</div>
         <div class="idx-value">${FMT.price(q.price)}</div>
@@ -187,7 +188,7 @@ const Dashboard = (() => {
       if (!q) return '';
       const sym = TICKER_SYMBOLS[i].replace('.NS', '').replace('=X', '').replace('^', '');
       const positive = q.changePct >= 0;
-      return `<span class="ticker-item">
+      return `<span class="ticker-item" data-symbol="${FMT.escHtml(TICKER_SYMBOLS[i])}">
         <span class="ticker-symbol">${FMT.escHtml(sym)}</span>
         <span class="ticker-price">${FMT.price(q.price)}</span>
         <span class="ticker-change ${positive ? 'positive' : 'negative'}">

@@ -4,7 +4,7 @@
 cleanup() {
     echo ""
     echo "Stopping servers..."
-    kill $PYTHON_PID 2>/dev/null
+    kill $PYTHON_PID $DHAN_PID 2>/dev/null
     exit
 }
 
@@ -21,7 +21,12 @@ echo "Starting Groww API Bridge on port 5050..."
 python groww_bridge.py &
 PYTHON_PID=$!
 
-# Give the bridge a second to initialize
+# Start Python Dhan Bridge
+echo "Starting Dhan API Bridge on port 5060..."
+python dhan_bridge.py --port 5060 &
+DHAN_PID=$!
+
+# Give the bridges a second to initialize
 sleep 1
 
 # Start Node.js Live Server
@@ -30,3 +35,4 @@ node server.js
 
 # Cleanup on exit
 cleanup
+

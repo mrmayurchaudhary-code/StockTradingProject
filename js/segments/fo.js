@@ -74,19 +74,16 @@ const FO = (() => {
     return Math.sign(x) * (1 - p * Math.exp(-x * x));
   };
 
+  let _expiries = [];
+  let _selectedExpiry = '';
+
   const init = async () => {
-    populateExpiries();
     setupControls();
     await loadFOData();
   };
 
   const populateExpiries = () => {
-    const sel = document.getElementById('foExpiry');
-    if (!sel) return;
-    const expiries = getExpiries();
-    sel.innerHTML = expiries.map((d, i) =>
-      `<option value="${i}">${i === 0 ? 'Weekly: ' : ''}${d}</option>`
-    ).join('');
+    // Deprecated in favor of dynamic Dhan expiries in loadFOData
   };
 
   const setupControls = () => {
@@ -104,8 +101,13 @@ const FO = (() => {
         document.querySelectorAll('.btn-select[data-value="options"], .btn-select[data-value="futures"]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         _selectedType = btn.dataset.value;
-        renderOptionChain();
+        loadOptionChainData();
       });
+    });
+
+    document.getElementById('foExpiry')?.addEventListener('change', async (e) => {
+      _selectedExpiry = e.target.value;
+      await loadOptionChainData();
     });
   };
 
@@ -115,7 +117,76 @@ const FO = (() => {
     _spotPrice = quote.price || idx.spot;
     _atmStrike = Math.round(_spotPrice / getStrikeDiff()) * getStrikeDiff();
     renderMetrics(quote);
+
+    try {
+      _expiries = await API.getOptionExpiryList(idx.symbol);
+      const sel = document.getElementById('foExpiry');
+      if (sel) {
+        sel.innerHTML = _expiries.map((d, i) =>
+          `<option value="${d}" ${d === _selectedExpiry ? 'selected' : ''}>${i === 0 ? 'Weekly: ' : ''}${d}</option>`
+        ).join('');
+        if (!_selectedExpiry || !_expiries.includes(_selectedExpiry)) {
+          _selectedExpiry = _expiries[0] || '';
+        }
+      }
+    } catch (e) {
+      console.warn('[Samadhan] Expiries load failed:', e);
+    }
+
+    await loadOptionChainData();
+  };
+
+  const loadOptionChainData = async () => {
+    if (_selectedExpiry) {
+      const data = await API.getOptionChain(INDICES[_selectedIndex].symbol, _selectedExpiry);
+      if (data && data.status === "success" && data.data && data.data.oc) {
+        renderDhanOptionChain(data.data.oc);
+        return;
+      }
+    }
     renderOptionChain();
+  };
+
+  const renderDhanOptionChain = (oc) => {
+    const strikes = Object.keys(oc).map(parseFloat).sort((a,b) => a-b);
+    
+    let totalCallOI = 0;
+    let totalPutOI = 0;
+    
+    const rows = strikes.map(strike => {
+      const strikeStr = strike.toFixed(6);
+      const row = oc[strikeStr] || {};
+      const ce = row.ce || { last_price: 0, oi: 0, implied_volatility: 0, greeks: { delta: 0 } };
+      const pe = row.pe || { last_price: 0, oi: 0, implied_volatility: 0, greeks: { delta: 0 } };
+      
+      totalCallOI += ce.oi || 0;
+      totalPutOI += pe.oi || 0;
+      
+      const isATM = Math.abs(strike - _spotPrice) < getStrikeDiff() / 2;
+      
+      const ceChg = ce.implied_volatility ? (ce.greeks.delta * 100) : 0;
+      const peChg = pe.implied_volatility ? (pe.greeks.delta * 100) : 0;
+      
+      return `<tr class="${isATM ? 'atm' : ''}">
+        <td class="call-cell">${FMT.volume(ce.oi)}</td>
+        <td class="call-cell ${ceChg >= 0 ? 'positive' : 'negative'}">${FMT.pct(ceChg)}</td>
+        <td class="call-cell" style="font-weight:${isATM ? '700' : '400'}">₹${FMT.price(ce.last_price)}</td>
+        <td class="strike-cell" style="font-weight:700;color:${isATM ? 'var(--accent-cyan)' : 'var(--text-primary)'}">${Math.round(strike)}</td>
+        <td class="put-cell" style="font-weight:${isATM ? '700' : '400'}">₹${FMT.price(pe.last_price)}</td>
+        <td class="put-cell ${peChg >= 0 ? 'positive' : 'negative'}">${FMT.pct(peChg)}</td>
+        <td class="put-cell">${FMT.volume(pe.oi)}</td>
+      </tr>`;
+    }).join('');
+
+    const pcr = totalCallOI > 0 ? (totalPutOI / totalCallOI).toFixed(2) : '1.00';
+    const pcrEl = document.getElementById('pcrValue');
+    if (pcrEl) {
+      pcrEl.textContent = pcr;
+      pcrEl.className = `pcr-value ${parseFloat(pcr) >= 1 ? 'bullish' : 'bearish'}`;
+    }
+
+    const tbody = document.getElementById('optionChainBody');
+    if (tbody) tbody.innerHTML = rows;
   };
 
   const getStrikeDiff = () => {

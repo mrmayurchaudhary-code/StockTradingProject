@@ -15,23 +15,36 @@ const BSE = (() => {
 
   let _quotes = {};
   let _selected = null;
+  let _allStocks = [...STOCKS];
+  let _holdings = [];
 
   const init = async () => {
-    renderList(STOCKS);
+    try {
+      _holdings = await API.getHoldings();
+    } catch (e) {
+      console.warn('[Samadhan] BSE holdings fetch error:', e);
+    }
+
+    const holdingsSymbols = _holdings.map(h => `${h.trading_symbol}.BO`);
+    holdingsSymbols.forEach(s => { NSE_MAP[s] = s.replace('.BO', '.NS'); });
+    const otherStocks = STOCKS.filter(s => !holdingsSymbols.includes(s));
+    _allStocks = [...holdingsSymbols, ...otherStocks];
+
+    renderList(_allStocks);
     setupSearch();
+    await loadList();
   };
 
   const loadList = async () => {
-    // Fetch using NSE equivalent for reliability, display as BSE
-    const nseSymbols = STOCKS.map(s => NSE_MAP[s]);
+    const nseSymbols = _allStocks.map(s => NSE_MAP[s] || s.replace('.BO', '.NS'));
     const quotes = await API.getMultipleQuotes(nseSymbols);
     quotes.forEach((q, i) => {
       if (q) {
-        const bseSym = STOCKS[i];
+        const bseSym = _allStocks[i];
         _quotes[bseSym] = { ...q, symbol: bseSym, exchange: 'BSE' };
       }
     });
-    renderList(STOCKS);
+    renderList(_allStocks);
   };
 
   const renderList = (symbols) => {
@@ -41,9 +54,16 @@ const BSE = (() => {
       const q = _quotes[sym] || FALLBACK.getQuote(sym);
       const displaySym = sym.replace('.BO', '');
       const positive = q.changePct >= 0;
+
+      const isHolding = _holdings.some(h => `${h.trading_symbol}.BO` === sym);
+      const holdingBadge = isHolding ? `<span class="segment-badge badge-etf" style="margin-left:4px;font-size:0.55rem;padding:1px 5px"><i class="ri-wallet-3-line"></i> Portfolio</span>` : '';
+
       return `<div class="stock-item ${_selected === sym ? 'active' : ''}" data-symbol="${FMT.escHtml(sym)}" role="button" tabindex="0">
         <div class="stock-item-info">
-          <div class="stock-item-symbol">${FMT.escHtml(displaySym)}</div>
+          <div class="stock-item-symbol" style="display:flex;align-items:center;gap:4px">
+            ${FMT.escHtml(displaySym)}
+            ${holdingBadge}
+          </div>
           <div class="stock-item-name">${FMT.escHtml(q.name || displaySym)}</div>
         </div>
         <div class="stock-item-price">
@@ -94,6 +114,47 @@ const BSE = (() => {
     const sym = q.symbol.replace('.BO', '');
     const positive = q.changePct >= 0;
 
+    // Check if it is in holdings
+    const holding = _holdings.find(h => `${h.trading_symbol}.BO` === q.symbol);
+    let holdingHtml = '';
+    if (holding) {
+      const currentVal = q.price * holding.quantity;
+      const investedVal = holding.average_price * holding.quantity;
+      const profitLoss = currentVal - investedVal;
+      const profitLossPct = investedVal > 0 ? (profitLoss / investedVal) * 100 : 0;
+      const pnlPositive = profitLoss >= 0;
+
+      holdingHtml = `
+        <div class="glass-card" style="margin:12px 0;border:1px solid var(--border-accent);padding:14px;background:rgba(0,217,126,0.02)">
+          <div class="card-header" style="margin-bottom:8px">
+            <h3 class="card-title" style="color:var(--accent-gold);font-size:0.8rem">
+              <i class="ri-wallet-3-fill" style="color:var(--accent-gold)"></i> YOUR PORTFOLIO POSITION
+            </h3>
+          </div>
+          <div class="stats-grid" style="margin:0;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div class="stat-item" style="padding:6px 8px">
+              <div class="stat-label" style="font-size:0.58rem">QTY</div>
+              <div class="stat-value" style="font-size:0.75rem">${holding.quantity}</div>
+            </div>
+            <div class="stat-item" style="padding:6px 8px">
+              <div class="stat-label" style="font-size:0.58rem">AVG PRICE</div>
+              <div class="stat-value" style="font-size:0.75rem">₹${FMT.price(holding.average_price)}</div>
+            </div>
+            <div class="stat-item" style="padding:6px 8px">
+              <div class="stat-label" style="font-size:0.58rem">CURRENT VAL</div>
+              <div class="stat-value" style="font-size:0.75rem">₹${FMT.price(currentVal)}</div>
+            </div>
+            <div class="stat-item" style="padding:6px 8px">
+              <div class="stat-label" style="font-size:0.58rem">P&L</div>
+              <div class="stat-value ${pnlPositive ? 'positive' : 'negative'}" style="font-size:0.75rem;font-weight:700">
+                ₹${FMT.price(profitLoss)} (${FMT.pct(profitLossPct)})
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     container.innerHTML = `
       <div class="stock-detail-header">
         <div class="stock-detail-title">
@@ -142,6 +203,9 @@ const BSE = (() => {
         </div>
       </div>
       <div class="chart-container" id="bseDetailChart" style="height:260px"></div>
+
+      ${holdingHtml}
+
       <div class="stats-grid">
         <div class="stat-item"><div class="stat-label">Open</div><div class="stat-value">₹${FMT.price(q.open)}</div></div>
         <div class="stat-item"><div class="stat-label">High</div><div class="stat-value" style="color:var(--color-positive)">₹${FMT.price(q.high)}</div></div>
@@ -221,8 +285,8 @@ const BSE = (() => {
     if (!input) return;
     input.addEventListener('input', () => {
       const q = input.value.trim().toLowerCase();
-      if (!q) { renderList(STOCKS); return; }
-      const filtered = STOCKS.filter(s => {
+      if (!q) { renderList(_allStocks); return; }
+      const filtered = _allStocks.filter(s => {
         const d = s.replace('.BO', '').toLowerCase();
         const name = (_quotes[s]?.name || '').toLowerCase();
         return d.includes(q) || name.includes(q);
@@ -231,7 +295,18 @@ const BSE = (() => {
     });
   };
 
-  const refresh = async () => { await loadList(); if (_selected) selectStock(_selected); };
+  const refresh = async () => {
+    try {
+      _holdings = await API.getHoldings();
+      const holdingsSymbols = _holdings.map(h => `${h.trading_symbol}.BO`);
+      holdingsSymbols.forEach(s => { NSE_MAP[s] = s.replace('.BO', '.NS'); });
+    } catch {}
+    await loadList();
+    if (_selected) selectStock(_selected);
+  };
 
-  return { init, refresh };
+  const getSelectedSymbol = () => _selected;
+  const getHoldingsSymbols = () => _holdings.map(h => `${h.trading_symbol}.BO`);
+
+  return { init, refresh, getSelectedSymbol, getHoldingsSymbols };
 })();

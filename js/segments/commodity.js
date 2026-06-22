@@ -90,9 +90,11 @@ const Commodity = (() => {
     });
   };
 
+  const getSelectedSymbol = () => _selected;
+
   const refresh = async () => {
     await init();
   };
 
-  return { init, refresh };
+  return { init, refresh, getSelectedSymbol };
 })();

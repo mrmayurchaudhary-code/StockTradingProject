@@ -11,25 +11,28 @@ const Charts = (() => {
   const _instances = new Map();
 
   // ── THEME CONFIG ──
-  const TV_THEME = {
-    layout: {
-      background: { color: 'transparent' },
-      textColor: '#94a3b8',
-    },
-    grid: {
-      vertLines: { color: 'rgba(255,255,255,0.04)' },
-      horzLines: { color: 'rgba(255,255,255,0.04)' },
-    },
-    crosshair: {
-      vertLine: { color: 'rgba(0,212,255,0.5)', width: 1, style: 1, labelBackgroundColor: '#0d1629' },
-      horzLine: { color: 'rgba(0,212,255,0.5)', width: 1, style: 1, labelBackgroundColor: '#0d1629' },
-    },
-    timeScale: {
-      borderColor: 'rgba(255,255,255,0.06)',
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    rightPriceScale: { borderColor: 'rgba(255,255,255,0.06)' },
+  const getTVTheme = () => {
+    const isLight = document.body.classList.contains('light-theme');
+    return {
+      layout: {
+        background: { color: 'transparent' },
+        textColor: isLight ? '#475569' : '#94a3b8',
+      },
+      grid: {
+        vertLines: { color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)' },
+        horzLines: { color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.04)' },
+      },
+      crosshair: {
+        vertLine: { color: isLight ? 'rgba(14,165,233,0.5)' : 'rgba(0,212,255,0.5)', width: 1, style: 1, labelBackgroundColor: isLight ? '#cbd5e1' : '#0d1629' },
+        horzLine: { color: isLight ? 'rgba(14,165,233,0.5)' : 'rgba(0,212,255,0.5)', width: 1, style: 1, labelBackgroundColor: isLight ? '#cbd5e1' : '#0d1629' },
+      },
+      timeScale: {
+        borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: { borderColor: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)' },
+    };
   };
 
   const CANDLE_COLORS = {
@@ -65,7 +68,7 @@ const Charts = (() => {
     const chart = LightweightCharts.createChart(container, {
       width: container.clientWidth || 600,
       height,
-      ...TV_THEME,
+      ...getTVTheme(),
     });
 
     // Responsive resize
@@ -273,5 +276,13 @@ const Charts = (() => {
       </div>`;
   };
 
-  return { renderChart, renderCandlestick, renderLine, renderArea, renderSparkline, renderBreadthChart, showChartLoading, showChartError, destroyChart };
+  const applyTheme = () => {
+    if (typeof LightweightCharts === 'undefined') return;
+    const theme = getTVTheme();
+    _instances.forEach(chart => {
+      chart.applyOptions(theme);
+    });
+  };
+
+  return { renderChart, renderCandlestick, renderLine, renderArea, renderSparkline, renderBreadthChart, showChartLoading, showChartError, destroyChart, applyTheme };
 })();

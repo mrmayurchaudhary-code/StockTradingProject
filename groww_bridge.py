@@ -208,7 +208,7 @@ def fetch_yfinance_quote(symbol):
     try:
         import yfinance as yf
         ticker_name = symbol
-        if not symbol.startswith('^') and not symbol.endswith('.NS') and not symbol.endswith('.BO') and not '=' in symbol:
+        if not symbol.startswith('^') and not symbol.endswith('.NS') and not symbol.endswith('.BO') and not '=' in symbol and not '-' in symbol:
             ticker_name = f"{symbol}.NS"
             
         print(f"[GrowwBridge] yfinance fetching quote for: {ticker_name}")
@@ -262,7 +262,7 @@ def fetch_yfinance_history(symbol, period='1y', interval='1d'):
     try:
         import yfinance as yf
         ticker_name = symbol
-        if not symbol.startswith('^') and not symbol.endswith('.NS') and not symbol.endswith('.BO') and not '=' in symbol:
+        if not symbol.startswith('^') and not symbol.endswith('.NS') and not symbol.endswith('.BO') and not '=' in symbol and not '-' in symbol:
             ticker_name = f"{symbol}.NS"
             
         print(f"[GrowwBridge] yfinance fetching history for: {ticker_name} (period={period}, interval={interval})")
@@ -316,6 +316,20 @@ def health():
         'timestamp': int(time.time() * 1000),
         'source': 'groww_bridge',
     })
+
+
+@app.route('/holdings')
+def holdings():
+    global groww
+    if not groww:
+        if not authenticate():
+            return jsonify({'error': 'Not authenticated with Groww'}), 401
+    try:
+        res = groww.get_holdings_for_user()
+        return jsonify(res)
+    except Exception as e:
+        print(f"[GrowwBridge] holdings fetch failed: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/quote')

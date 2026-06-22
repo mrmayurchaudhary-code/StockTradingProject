@@ -48,6 +48,10 @@ const YAHOO_HOSTS = {
 const GROWW_BRIDGE_HOST = '127.0.0.1';
 const GROWW_BRIDGE_PORT = parseInt(process.env.GROWW_BRIDGE_PORT || '5050', 10);
 
+// Dhan API Bridge (Python server)
+const DHAN_BRIDGE_HOST = '127.0.0.1';
+const DHAN_BRIDGE_PORT = parseInt(process.env.DHAN_BRIDGE_PORT || '5060', 10);
+
 // ── YAHOO FINANCE PROXY ──
 function proxyYahoo(req, res, yahooPath, host) {
   const options = {
@@ -223,6 +227,57 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Dhan API Bridge Proxy ──
+  // /api/dhan/* → localhost:5060/*
+  if (pathname.startsWith('/api/dhan/')) {
+    const dhanPath = '/' + pathname.slice('/api/dhan/'.length) + (parsed.search || '');
+    console.log(`[Dhan Proxy] → localhost:${DHAN_BRIDGE_PORT}${dhanPath}`);
+
+    const proxyReq = http.request({
+      hostname: DHAN_BRIDGE_HOST,
+      port: DHAN_BRIDGE_PORT,
+      path: dhanPath,
+      method: req.method,
+      headers: { 'Accept': 'application/json' },
+      timeout: 15000,
+    }, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, {
+        'Content-Type': proxyRes.headers['content-type'] || 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Accept',
+        'Cache-Control': 'no-cache',
+        'X-Proxy-Source': 'samadhan-dhan',
+      });
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error(`[Dhan Proxy Error] ${dhanPath} → ${err.message}`);
+      if (!res.headersSent) {
+        res.writeHead(502, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(JSON.stringify({ error: 'Dhan bridge not available', detail: err.message }));
+      }
+    });
+
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy();
+      if (!res.headersSent) {
+        res.writeHead(504, {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(JSON.stringify({ error: 'Dhan bridge timed out' }));
+      }
+    });
+
+    proxyReq.end();
+    return;
+  }
+
   // ── Yahoo Finance API Proxy Routes ──
   // /api/yahoo1/* → query1.finance.yahoo.com/*
   // /api/yahoo2/* → query2.finance.yahoo.com/*
@@ -249,6 +304,72 @@ const server = http.createServer((req, res) => {
 
   // ── Static Files ──
   serveStatic(req, res, pathname);
+});
+
+// ── WEBSOCKET UPGRADE PROXY ──
+server.on('upgrade', (req, socket, head) => {
+  socket.on('error', (err) => {
+    console.warn('[Dhan WS Proxy client socket error before upgrade]', err.message);
+  });
+
+  const parsed = url.parse(req.url);
+  const pathname = parsed.pathname;
+
+  if (pathname.startsWith('/api/dhan/')) {
+    const targetPath = '/' + pathname.slice('/api/dhan/'.length) + (parsed.search || '');
+    console.log(`[Dhan WS Proxy] Upgrading WebSocket connection to localhost:${DHAN_BRIDGE_PORT}${targetPath}`);
+
+    const options = {
+      hostname: DHAN_BRIDGE_HOST,
+      port: DHAN_BRIDGE_PORT,
+      path: targetPath,
+      method: 'GET',
+      headers: {
+        'Connection': 'Upgrade',
+        'Upgrade': 'websocket',
+        'Sec-WebSocket-Key': req.headers['sec-websocket-key'],
+        'Sec-WebSocket-Version': req.headers['sec-websocket-version'] || '13',
+        ...req.headers
+      }
+    };
+
+    const proxyReq = http.request(options);
+    proxyReq.on('upgrade', (proxyRes, proxySocket, proxyHead) => {
+      // Add error handlers to prevent crash on connection reset/closed sockets
+      socket.on('error', (err) => {
+        console.warn('[Dhan WS Proxy client socket error]', err.message);
+        proxySocket.destroy();
+      });
+      proxySocket.on('error', (err) => {
+        console.warn('[Dhan WS Proxy target socket error]', err.message);
+        socket.destroy();
+      });
+
+      let responseHeaders = `HTTP/1.1 101 Switching Protocols\r\n`;
+      for (const [key, value] of Object.entries(proxyRes.headers)) {
+        responseHeaders += `${key}: ${value}\r\n`;
+      }
+      responseHeaders += '\r\n';
+      
+      socket.write(responseHeaders);
+      
+      if (proxyHead && proxyHead.length) {
+        socket.write(proxyHead);
+      }
+
+      proxySocket.pipe(socket);
+      socket.pipe(proxySocket);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error(`[Dhan WS Proxy Error] ${pathname} → ${err.message}`);
+      socket.destroy();
+    });
+
+    proxyReq.end();
+  } else {
+    socket.destroy();
+  }
 });
 
 // ── START ──

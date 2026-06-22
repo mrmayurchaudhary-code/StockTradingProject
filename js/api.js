@@ -14,6 +14,9 @@ const API = (() => {
   // Groww API Bridge (primary — live Indian market data)
   const GROWW_PROXY_BASE = '/api/groww';
 
+  // Dhan API Bridge
+  const DHAN_PROXY_BASE = '/api/dhan';
+
   // Local Yahoo proxy server (fallback)
   const LOCAL_PROXY_BASE = '/api/yahoo1';   // Proxied via server.js
   const LOCAL_PROXY2     = '/api/yahoo2';   // query2 endpoint
@@ -39,7 +42,9 @@ const API = (() => {
   let _localProxyAvailable = null;   // null = not checked, true/false = result
   let _growwAvailable = null;        // null = not checked, true/false = result
   let _growwAuthenticated = false;   // true when Groww bridge is running AND authenticated
-  let _dataSource = 'simulation';    // 'groww' | 'yahoo' | 'simulation'
+  let _dhanAvailable = null;
+  let _dhanAuthenticated = false;
+  let _dataSource = 'simulation';    // 'dhan' | 'groww' | 'yahoo' | 'simulation'
 
   // ── DETECT GROWW BRIDGE ──
   const checkGrowwBridge = async () => {
@@ -90,8 +95,36 @@ const API = (() => {
     }
   };
 
-  // Initial checks on load (Groww first, then Yahoo)
+  // ── DETECT DHAN BRIDGE ──
+  const checkDhanBridge = async () => {
+    if (_dhanAvailable !== null) return _dhanAvailable && _dhanAuthenticated;
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      const resp = await fetch(`${DHAN_PROXY_BASE}/health`, { signal: controller.signal });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      _dhanAvailable = data.status === 'ok';
+      _dhanAuthenticated = data.authenticated === true;
+      if (_dhanAuthenticated) {
+        _dataSource = 'dhan';
+        console.log('[Samadhan] 🟢 Dhan API Bridge detected — LIVE market data active');
+      } else if (_dhanAvailable) {
+        console.log('[Samadhan] 🟡 Dhan Bridge running but NOT authenticated — using fallback mode');
+      }
+      return _dhanAvailable && _dhanAuthenticated;
+    } catch {
+      _dhanAvailable = false;
+      _dhanAuthenticated = false;
+      console.log('[Samadhan] ⚪ Dhan Bridge not detected');
+      return false;
+    }
+  };
+
+  // Initial checks on load (Dhan & Groww first, then Yahoo)
   (async () => {
+    await checkDhanBridge();
     await checkGrowwBridge();
     await checkLocalProxy();
   })();
@@ -123,6 +156,187 @@ const API = (() => {
     if (_cache.size > 200) {
       const oldest = [..._cache.entries()].sort((a, b) => a[1].ts - b[1].ts)[0];
       if (oldest) _cache.delete(oldest[0]);
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════
+  //  BINANCE API PROVIDER (For Crypto Tab)
+  // ════════════════════════════════════════════════════════════
+
+  const mapToBinanceSymbol = (sym) => {
+    const mapping = {
+      'BTC-USD': 'BTCUSDT',
+      'ETH-USD': 'ETHUSDT',
+      'USDT-USD': 'USDTUSD',
+      'BNB-USD': 'BNBUSDT',
+      'SOL-USD': 'SOLUSDT'
+    };
+    return mapping[sym] || sym.replace('-USD', 'USDT');
+  };
+
+  const mapIntervalToBinance = (interval) => {
+    const mapping = {
+      '1d': '1d',
+      '1m': '1m',
+      '2m': '1m',
+      '3m': '3m',
+      '5m': '5m',
+      '15m': '15m',
+      '30m': '30m',
+      '60m': '1h',
+      '1h': '1h',
+      '1wk': '1w',
+      '1w': '1w',
+      '1mo': '1M',
+    };
+    return mapping[interval] || '1d';
+  };
+
+  const getLimitForRange = (range, interval) => {
+    if (interval.endsWith('m')) {
+      const mins = parseInt(interval) || 5;
+      const ranges = { '1d': 1440 / mins, '5d': (1440 * 5) / mins, '1mo': (1440 * 30) / mins };
+      return Math.round(ranges[range] || (1440 / mins));
+    } else {
+      const days = { '1d': 1, '5d': 5, '1mo': 30, '3mo': 90, '6mo': 180, '1y': 365, '2y': 730, '5y': 1825 };
+      return days[range] || 365;
+    }
+  };
+
+  const fetchBinanceQuote = async (symbol) => {
+    const binanceSym = mapToBinanceSymbol(symbol);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    try {
+      const resp = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${binanceSym}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Binance HTTP ${resp.status}`);
+      const data = await resp.json();
+      
+      const price = parseFloat(data.lastPrice);
+      const open = parseFloat(data.openPrice);
+      const high = parseFloat(data.highPrice);
+      const low = parseFloat(data.lowPrice);
+      const prevClose = parseFloat(data.prevClosePrice);
+      const change = parseFloat(data.priceChange);
+      const changePct = parseFloat(data.priceChangePercent);
+      const volume = parseFloat(data.volume);
+      
+      return {
+        symbol,
+        name: symbol.replace('-USD', ''),
+        price,
+        open,
+        high,
+        low,
+        prevClose,
+        change,
+        changePct,
+        volume,
+        marketCap: null,
+        currency: 'USD',
+        exchange: 'Binance',
+        week52High: high,
+        week52Low: low,
+        pe: null,
+        bidPrice: parseFloat(data.bidPrice),
+        bidQty: parseFloat(data.bidQty),
+        offerPrice: parseFloat(data.askPrice),
+        offerQty: parseFloat(data.askQty),
+        _live: true,
+        _source: 'binance',
+      };
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const fetchBinanceHistory = async (symbol, range, interval) => {
+    const binanceSym = mapToBinanceSymbol(symbol);
+    const binanceInterval = mapIntervalToBinance(interval);
+    const limit = getLimitForRange(range, interval);
+    
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2000);
+    try {
+      const resp = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${binanceInterval}&limit=${limit}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Binance History HTTP ${resp.status}`);
+      const data = await resp.json();
+      
+      return data.map(c => ({
+        time: Math.floor(c[0] / 1000),
+        open: parseFloat(c[1]),
+        high: parseFloat(c[2]),
+        low: parseFloat(c[3]),
+        close: parseFloat(c[4]),
+        volume: parseFloat(c[5])
+      }));
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  // ════════════════════════════════════════════════════════════
+  //  DHAN API PROVIDER
+  // ════════════════════════════════════════════════════════════
+
+  const fetchDhanQuote = async (symbol) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/quote?symbol=${encodeURIComponent(symbol)}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Dhan HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const fetchDhanMultiQuotes = async (symbols) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/quotes?symbols=${encodeURIComponent(symbols.join(','))}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Dhan batch HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
+    }
+  };
+
+  const fetchDhanHistory = async (symbol, range, interval) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const params = new URLSearchParams({ symbol, range, interval });
+      const resp = await fetch(`${DHAN_PROXY_BASE}/history?${params}`, {
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!resp.ok) throw new Error(`Dhan history HTTP ${resp.status}`);
+      const data = await resp.json();
+      return data.candles || [];
+    } catch (err) {
+      clearTimeout(timer);
+      throw err;
     }
   };
 
@@ -339,16 +553,45 @@ const API = (() => {
   //  PUBLIC API  — Groww → Yahoo → Simulation
   // ════════════════════════════════════════════════════════════
 
-  const getQuote = async (symbol) => {
+  const getQuote = async (symbol, bypassCache = false) => {
     symbol = sanitizeSymbol(symbol);
     if (!symbol) throw new Error('Invalid symbol');
 
     // Check cache first
     const cacheKey = `quote:${symbol}`;
-    const cached = fromCache(cacheKey);
-    if (cached) return cached;
+    if (!bypassCache) {
+      const cached = fromCache(cacheKey);
+      if (cached) return cached;
+    }
+
+    // Route to Binance for Crypto
+    if (symbol.endsWith('-USD') || symbol.endsWith('-USDT')) {
+      try {
+        const bq = await fetchBinanceQuote(symbol);
+        toCache(cacheKey, bq);
+        return bq;
+      } catch (err) {
+        console.warn(`[Samadhan] Binance quote failed for ${symbol}:`, err.message);
+        return FALLBACK.getQuote(symbol);
+      }
+    }
 
     await waitForRateLimit(symbol);
+
+    // 0. Try Dhan API first
+    const dhanReady = await checkDhanBridge();
+    if (dhanReady) {
+      try {
+        const dq = await fetchDhanQuote(symbol);
+        if (dq && dq.price) {
+          _dataSource = 'dhan';
+          toCache(cacheKey, dq);
+          return dq;
+        }
+      } catch (err) {
+        console.warn(`[Samadhan] Dhan quote failed for ${symbol}:`, err.message);
+      }
+    }
 
     // 1. Try Groww API first
     const growwReady = await checkGrowwBridge();
@@ -422,6 +665,30 @@ const API = (() => {
     symbol = sanitizeSymbol(symbol);
     if (!symbol) return [];
 
+    // Route to Binance for Crypto
+    if (symbol.endsWith('-USD') || symbol.endsWith('-USDT')) {
+      try {
+        const hist = await fetchBinanceHistory(symbol, range, interval);
+        if (hist && hist.length > 0) return hist;
+      } catch (err) {
+        console.warn(`[Samadhan] Binance history failed for ${symbol}:`, err.message);
+        return FALLBACK.getHistory(symbol, range, interval);
+      }
+    }
+
+    // 0. Try Dhan API first
+    const dhanReady = await checkDhanBridge();
+    if (dhanReady) {
+      try {
+        const hist = await fetchDhanHistory(symbol, range, interval);
+        if (hist && hist.length > 0) {
+          return hist;
+        }
+      } catch (err) {
+        console.warn(`[Samadhan] Dhan history failed for ${symbol}:`, err.message);
+      }
+    }
+
     // 1. Try Groww API first
     const growwReady = await checkGrowwBridge();
     if (growwReady) {
@@ -464,7 +731,23 @@ const API = (() => {
     }
   };
 
-  const getMultipleQuotes = async (symbols) => {
+  const getMultipleQuotes = async (symbols, bypassCache = false) => {
+    // 0. Try Dhan batch endpoint first
+    const dhanReady = await checkDhanBridge();
+    if (dhanReady) {
+      try {
+        const results = await fetchDhanMultiQuotes(symbols);
+        if (Array.isArray(results) && results.length > 0) {
+          return results.map((r, i) => {
+            if (r && r.price) return r;
+            return FALLBACK.getQuote(symbols[i]);
+          });
+        }
+      } catch (err) {
+        console.warn('[Samadhan] Dhan batch quotes failed:', err.message);
+      }
+    }
+
     // 1. Try Groww batch endpoint first
     const growwReady = await checkGrowwBridge();
     if (growwReady) {
@@ -548,6 +831,24 @@ const API = (() => {
     }
   };
 
+  const getHoldings = async () => {
+    const growwReady = await checkGrowwBridge();
+    if (growwReady) {
+      try {
+        const resp = await fetch(`${GROWW_PROXY_BASE}/holdings`, {
+          headers: { 'Accept': 'application/json' },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return data.holdings || [];
+        }
+      } catch (err) {
+        console.warn('[Samadhan] getHoldings failed:', err.message);
+      }
+    }
+    return [];
+  };
+
   const invalidateCache = () => _cache.clear();
 
   // Reset all provider detection (useful after starting servers)
@@ -555,25 +856,182 @@ const API = (() => {
     _localProxyAvailable = null;
     _growwAvailable = null;
     _growwAuthenticated = false;
+    _dhanAvailable = null;
+    _dhanAuthenticated = false;
     (async () => {
+      await checkDhanBridge();
       await checkGrowwBridge();
       await checkLocalProxy();
     })();
   };
 
-  // Check if live data is available (either Groww or Yahoo)
-  const isLive = () => _growwAuthenticated || _localProxyAvailable === true;
+  // Check if live data is available (either Groww, Dhan or Yahoo)
+  const isLive = () => _growwAuthenticated || _dhanAuthenticated || _localProxyAvailable === true;
 
   // Check if Groww live data is active
   const isGrowwLive = () => _growwAuthenticated;
 
+  // Check if Dhan live data is active
+  const isDhanLive = () => _dhanAuthenticated;
+
   // Get current data source identifier
   const getDataSource = () => _dataSource;
 
+  // New Dhan Specific Data APIs
+  const getOptionExpiryList = async (symbol) => {
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/optionchain/expirylist?symbol=${encodeURIComponent(symbol)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const res = await resp.json();
+      return res.data || [];
+    } catch (e) {
+      console.warn('[Samadhan] getOptionExpiryList failed:', e);
+      // Return simulated Thursdays as fallback
+      const dates = [];
+      let d = new Date();
+      while (dates.length < 5) {
+        d = new Date(d.getTime() + 86400000);
+        if (d.getDay() === 4) {
+          dates.push(d.toISOString().split('T')[0]);
+        }
+      }
+      return dates;
+    }
+  };
+
+  const getOptionChain = async (symbol, expiry) => {
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/optionchain?symbol=${encodeURIComponent(symbol)}&expiry=${encodeURIComponent(expiry)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (e) {
+      console.warn('[Samadhan] getOptionChain failed:', e);
+      return null;
+    }
+  };
+
+  const getMarketDepth = async (symbol) => {
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/depth?symbol=${encodeURIComponent(symbol)}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (e) {
+      console.warn('[Samadhan] getMarketDepth failed:', e);
+      return null;
+    }
+  };
+
+  const getExpiredOptions = async (symbol, strike, fromDate, toDate) => {
+    try {
+      const resp = await fetch(`${DHAN_PROXY_BASE}/expired-options?symbol=${encodeURIComponent(symbol)}&strike=${encodeURIComponent(strike)}&from=${encodeURIComponent(fromDate || '')}&to=${encodeURIComponent(toDate || '')}`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return await resp.json();
+    } catch (e) {
+      console.warn('[Samadhan] getExpiredOptions failed:', e);
+      return null;
+    }
+  };
+
+  // ── WEBSOCKET CLIENT FOR REAL-TIME BROADCAST ──
+  let _ws = null;
+  let _wsSubscribed = new Set();
+  const _wsHandlers = new Set();
+
+  const connectWebSocket = () => {
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/dhan/ws`;
+      
+      console.log('[Samadhan] 🔌 Connecting to live Dhan WebSocket feed:', wsUrl);
+      _ws = new WebSocket(wsUrl);
+
+      _ws.onopen = () => {
+        console.log('[Samadhan] 🟢 Live WebSocket feed connected successfully');
+        // Resubscribe to any active symbols
+        if (_wsSubscribed.size > 0) {
+          _ws.send(JSON.stringify({
+            action: 'subscribe',
+            symbols: Array.from(_wsSubscribed)
+          }));
+        }
+      };
+
+      _ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'ticks' && Array.isArray(msg.data)) {
+            _wsHandlers.forEach(handler => handler(msg.data));
+          }
+        } catch (err) {
+          console.warn('[Samadhan] Error parsing WebSocket message:', err);
+        }
+      };
+
+      _ws.onerror = (err) => {
+        console.error('[Samadhan] ❌ WebSocket feed error:', err);
+      };
+
+      _ws.onclose = () => {
+        console.log('[Samadhan] 🔴 WebSocket feed closed. Reconnecting in 3s...');
+        setTimeout(connectWebSocket, 3000);
+      };
+    } catch (e) {
+      console.error('[Samadhan] WebSocket setup error:', e);
+    }
+  };
+
+  const subscribeQuotes = (symbols) => {
+    const syms = symbols.map(s => s.toUpperCase());
+    const toSub = [];
+    syms.forEach(s => {
+      if (!_wsSubscribed.has(s)) {
+        _wsSubscribed.add(s);
+        toSub.push(s);
+      }
+    });
+
+    if (toSub.length > 0 && _ws && _ws.readyState === WebSocket.OPEN) {
+      _ws.send(JSON.stringify({
+        action: 'subscribe',
+        symbols: toSub
+      }));
+    }
+  };
+
+  const unsubscribeQuotes = (symbols) => {
+    const syms = symbols.map(s => s.toUpperCase());
+    const toUnsub = [];
+    syms.forEach(s => {
+      if (_wsSubscribed.has(s)) {
+        _wsSubscribed.delete(s);
+        toUnsub.push(s);
+      }
+    });
+
+    if (toUnsub.length > 0 && _ws && _ws.readyState === WebSocket.OPEN) {
+      _ws.send(JSON.stringify({
+        action: 'unsubscribe',
+        symbols: toUnsub
+      }));
+    }
+  };
+
+  const onTick = (handler) => {
+    _wsHandlers.add(handler);
+    return () => _wsHandlers.delete(handler);
+  };
+
+  const isWebSocketActive = () => _ws && _ws.readyState === WebSocket.OPEN;
+
+  // Initial trigger
+  setTimeout(connectWebSocket, 1000);
+
   // ── EXPOSE ──
   return {
-    getQuote, getHistory, getMultipleQuotes, searchSymbols,
-    invalidateCache, resetProxyCheck, isLive, isGrowwLive, getDataSource,
+    getQuote, getHistory, getMultipleQuotes, searchSymbols, getHoldings,
+    invalidateCache, resetProxyCheck, isLive, isGrowwLive, isDhanLive, getDataSource,
+    getOptionExpiryList, getOptionChain, getMarketDepth, getExpiredOptions, checkDhanBridge,
+    subscribeQuotes, unsubscribeQuotes, onTick, isWebSocketActive
   };
 })();
 
@@ -644,6 +1102,12 @@ const FALLBACK = (() => {
     'JPYINR=X': { name: 'JPY/INR',   base: 0.5412, exchange: 'FOREX', type: 'CURRENCY' },
     'AUDINR=X': { name: 'AUD/INR',   base: 54.32,  exchange: 'FOREX', type: 'CURRENCY' },
     'SGDINR=X': { name: 'SGD/INR',   base: 62.18,  exchange: 'FOREX', type: 'CURRENCY' },
+    // Crypto
+    'BTC-USD':  { name: 'Bitcoin',   base: 67250.00, exchange: 'CRYPTO', type: 'CRYPTOCURRENCY' },
+    'ETH-USD':  { name: 'Ethereum',  base: 3520.00,  exchange: 'CRYPTO', type: 'CRYPTOCURRENCY' },
+    'USDT-USD': { name: 'Tether',    base: 1.00,     exchange: 'CRYPTO', type: 'CRYPTOCURRENCY' },
+    'BNB-USD':  { name: 'BNB',       base: 585.00,   exchange: 'CRYPTO', type: 'CRYPTOCURRENCY' },
+    'SOL-USD':  { name: 'Solana',    base: 145.00,   exchange: 'CRYPTO', type: 'CRYPTOCURRENCY' },
   };
 
   // Persistent volatility seeds per symbol (so prices move consistently in one session)
@@ -658,7 +1122,12 @@ const FALLBACK = (() => {
     const info = STOCKS[symbol] || { base: 1000 };
     const seed = getSeed(symbol);
     const intraVolatility = 0.015;
-    const chgPct = seed * intraVolatility + (Math.random() - 0.499) * 0.003;
+    
+    // Skip mock fluctuations if the market is closed
+    const open = typeof isMarketOpenForSymbol === 'function' ? isMarketOpenForSymbol(symbol) : true;
+    const fluctuation = open ? (Math.random() - 0.499) * 0.003 : 0.0;
+    
+    const chgPct = seed * intraVolatility + fluctuation;
     const price = +(info.base * (1 + chgPct)).toFixed(2);
     const chg = +(price - info.base).toFixed(2);
     return { price, chg, pct: +((chg / info.base) * 100).toFixed(2) };
@@ -667,6 +1136,7 @@ const FALLBACK = (() => {
   const getQuote = (symbol) => {
     const info = STOCKS[symbol] || { name: symbol, base: 1000, exchange: 'NSE' };
     const { price, chg, pct } = livePrice(symbol);
+    const isCrypto = info.exchange === 'CRYPTO' || symbol.endsWith('-USD');
     return {
       symbol,
       name: info.name || symbol,
@@ -679,7 +1149,7 @@ const FALLBACK = (() => {
       change: chg,
       changePct: pct,
       marketCap: info.cap || null,
-      currency: 'INR',
+      currency: isCrypto ? 'USD' : 'INR',
       exchange: info.exchange || 'NSE',
       week52High: +(info.base * 1.38).toFixed(2),
       week52Low: +(info.base * 0.68).toFixed(2),
@@ -802,3 +1272,31 @@ const FMT = {
   changeClass: (n) => n >= 0 ? 'positive' : 'negative',
   changeIcon: (n) => n >= 0 ? 'ri-arrow-up-s-fill' : 'ri-arrow-down-s-fill',
 };
+
+const isMarketOpenForSymbol = (symbol) => {
+  if (!symbol) return false;
+  
+  const now = new Date();
+  const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const day = ist.getDay();
+  const h = ist.getHours();
+  const m = ist.getMinutes();
+  const mins = h * 60 + m;
+  const isWeekday = day >= 1 && day <= 5;
+
+  const nseOpen = isWeekday && mins >= 555 && mins < 930;     // 9:15 AM - 3:30 PM IST
+  const mcxOpen = isWeekday && mins >= 540 && mins < 1410;    // 9:00 AM - 11:30 PM IST
+  const forexOpen = isWeekday && mins >= 540 && mins < 1020;  // 9:00 AM - 5:00 PM IST
+  const cryptoOpen = true;
+
+  const sym = symbol.toUpperCase();
+  if (sym.startsWith('^')) return nseOpen;
+  if (sym.endsWith('-USD') || sym.endsWith('-USDT')) return cryptoOpen;
+  if (sym.endsWith('=F') || sym.startsWith('MCX:')) return mcxOpen;
+  if (sym.endsWith('=X') || sym.includes('INR=X')) return forexOpen;
+  return nseOpen; // Default: Indian equities
+};
+
+if (typeof window !== 'undefined') {
+  window.isMarketOpenForSymbol = isMarketOpenForSymbol;
+}
