@@ -285,7 +285,7 @@ window.BreakoutKingsScanner = (() => {
   // ── NIFTY BASELINE ──
   const fetchNiftyBaseline = async () => {
     try {
-      const hist = await window.API.getHistory('^NSEI', '1y', '1d');
+      const hist = await API.getHistory('^NSEI', '1y', '1d');
       if (hist && hist.length > 60) {
         const lastIdx = hist.length - 1;
         const closeToday = hist[lastIdx].close;

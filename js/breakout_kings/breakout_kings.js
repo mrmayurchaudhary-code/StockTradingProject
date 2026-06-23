@@ -44,14 +44,20 @@ window.BreakoutKings = (() => {
     });
 
     // Category card click filters
-    ['bk_card_orb', 'bk_card_rs', 'bk_card_gap', 'bk_card_inside'].forEach(id => {
+    const cardMapping = {
+      'bk_card_orb': 'orb',
+      'bk_card_rs': 'rs',
+      'bk_card_gap': 'gap',
+      'bk_card_inside': 'inside'
+    };
+    Object.entries(cardMapping).forEach(([id, type]) => {
       document.getElementById(id)?.addEventListener('click', () => {
-        // Visual feedback only — future: filter by category
         const card = document.getElementById(id);
         if (card) {
           card.style.transform = 'scale(0.97)';
           setTimeout(() => { card.style.transform = ''; }, 150);
         }
+        window.BreakoutKingsUI.setScannerFilter(type);
       });
     });
 
@@ -161,7 +167,7 @@ window.BreakoutKings = (() => {
       await Promise.all(batch.map(async (symbol) => {
         if (!_scanning) return;
         try {
-          const history = await window.API.getHistory(symbol, '1y', '1d');
+          const history = await API.getHistory(symbol, '1y', '1d');
           if (!history || history.length === 0) throw new Error('No data');
 
           const result = window.BreakoutKingsScanner.scanStock(symbol, history, niftyReturn);

@@ -8,6 +8,7 @@
 window.BreakoutKingsUI = (() => {
 
   let _scanResults = [];
+  let _activeScannerFilter = null;
 
   const init = () => {
     // Filter change listeners
@@ -23,6 +24,29 @@ window.BreakoutKingsUI = (() => {
     updateCategoryCards();
   };
 
+  const setScannerFilter = (type) => {
+    if (_activeScannerFilter === type) {
+      _activeScannerFilter = null; // Toggle off
+    } else {
+      _activeScannerFilter = type; // Toggle on
+    }
+
+    // Update active classes on cards
+    const cardTypes = ['orb', 'rs', 'gap', 'inside'];
+    cardTypes.forEach(t => {
+      const card = document.getElementById(`bk_card_${t}`);
+      if (card) {
+        if (t === _activeScannerFilter) {
+          card.classList.add('active');
+        } else {
+          card.classList.remove('active');
+        }
+      }
+    });
+
+    applyFilter();
+  };
+
   const getFilteredResults = () => {
     const filterCat = document.getElementById('bk_f_category')?.value || 'all';
     const filterScoreMin = parseInt(document.getElementById('bk_f_score_min')?.value || '0', 10);
@@ -32,6 +56,12 @@ window.BreakoutKingsUI = (() => {
     let filtered = _scanResults.filter(r => {
       // Only show qualifying stocks (score >= 55)
       if (r.category === 'Ignore') return false;
+
+      // Active category card filter
+      if (_activeScannerFilter === 'orb' && !r.isORB) return false;
+      if (_activeScannerFilter === 'rs' && !r.isHighRS) return false;
+      if (_activeScannerFilter === 'gap' && !r.isGapUp) return false;
+      if (_activeScannerFilter === 'inside' && !r.isInsideBar) return false;
 
       // Market filter
       if (selectMarket === 'nse' && !r.symbol.endsWith('.NS')) return false;
@@ -293,7 +323,8 @@ window.BreakoutKingsUI = (() => {
     updateResults,
     applyFilter,
     getStats,
-    getFilteredResults
+    getFilteredResults,
+    setScannerFilter
   };
 
 })();
