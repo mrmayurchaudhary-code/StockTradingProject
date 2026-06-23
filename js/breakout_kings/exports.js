@@ -179,7 +179,7 @@ window.BreakoutKingsExports = (() => {
       </head>
       <body>
         <h1>Breakout Kings Scanner Report</h1>
-        <p class="subtitle">Samadhan Trading Platform — Generated on ${timeStr}</p>
+        <p class="subtitle">Trading Platform — Generated on ${timeStr}</p>
         
         <div class="stats-grid">
           <div class="stat-box">
@@ -221,7 +221,7 @@ window.BreakoutKingsExports = (() => {
         </table>
 
         <div class="footer">
-          Samadhan Trading Systems © 2026. All Rights Reserved. Confidential Quant Report.
+          Trading Systems © 2026. All Rights Reserved. Confidential Quant Report.
         </div>
       </body>
       </html>

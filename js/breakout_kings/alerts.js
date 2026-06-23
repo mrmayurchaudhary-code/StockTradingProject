@@ -147,7 +147,7 @@ window.BreakoutKingsAlerts = (() => {
     // Simulate SMTP delivery logs
     console.log(`[BreakoutKings] ✉️ Simulating SMTP delivery to ${emailAddr}:
 Subject: ${alert.title} for ${alert.symbol}
-Body: ${alert.body} (Sent via Samadhan Mailer Service)`);
+Body: ${alert.body} (Sent via Trading Mailer Service)`);
   };
 
   const sendPushNotification = (alert) => {

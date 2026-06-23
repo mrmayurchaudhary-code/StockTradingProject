@@ -78,7 +78,7 @@ function proxyYahoo(req, res, yahooPath, host) {
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Accept',
       'Cache-Control': 'no-cache',
-      'X-Proxy-Source': 'samadhan-local',
+      'X-Proxy-Source': 'trading-local',
     });
 
     proxyRes.pipe(res);
@@ -196,7 +196,7 @@ const server = http.createServer((req, res) => {
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Accept',
         'Cache-Control': 'no-cache',
-        'X-Proxy-Source': 'samadhan-groww',
+        'X-Proxy-Source': 'trading-groww',
       });
       proxyRes.pipe(res);
     });
@@ -247,7 +247,7 @@ const server = http.createServer((req, res) => {
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Accept',
         'Cache-Control': 'no-cache',
-        'X-Proxy-Source': 'samadhan-dhan',
+        'X-Proxy-Source': 'trading-dhan',
       });
       proxyRes.pipe(res);
     });
@@ -414,7 +414,7 @@ server.on('upgrade', (req, socket, head) => {
 server.listen(PORT, () => {
   console.log('');
   console.log('  ╔══════════════════════════════════════════════════╗');
-  console.log('  ║     🚀 Samadhan Trading — Live Server           ║');
+  console.log('  ║     🚀 Trading — Live Server                    ║');
   console.log('  ╠══════════════════════════════════════════════════╣');
   console.log(`  ║  Local:  http://localhost:${PORT}                   ║`);
   console.log('  ║  Proxy:  Yahoo Finance API (CORS-free)          ║');

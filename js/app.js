@@ -1194,7 +1194,7 @@ const Router = {
     setTimeout(() => {
       const source = API.getDataSource ? API.getDataSource() : 'simulation';
       const sourceLabel = source === 'groww' ? '🟢 Groww Live Data' : (source === 'yahoo' ? '✅ Yahoo Finance' : '📊 Demo Data');
-      AppState.toast(`Welcome to Samadhan Trading! ${sourceLabel} — Updates every 15 seconds.`, 'info', 5000);
+      AppState.toast(`Welcome to Trading! ${sourceLabel} — Updates every 15 seconds.`, 'info', 5000);
     }, 1500);
 
   } catch (err) {
