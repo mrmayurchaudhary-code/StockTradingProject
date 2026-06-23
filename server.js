@@ -295,6 +295,44 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ── Yahoo Finance RSS Proxy ──
+  if (pathname === '/api/news') {
+    const options = {
+      hostname: 'finance.yahoo.com',
+      port: 443,
+      path: '/rss/topstories',
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      timeout: 10000,
+    };
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, {
+        'Content-Type': 'application/rss+xml; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'max-age=300',
+      });
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error(`[News Proxy Error] ${err.message}`);
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'Failed to fetch news RSS feed', detail: err.message }));
+    });
+
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy();
+      res.writeHead(504, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'News proxy request timed out' }));
+    });
+
+    proxyReq.end();
+    return;
+  }
+
   // ── Health check ──
   if (pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });

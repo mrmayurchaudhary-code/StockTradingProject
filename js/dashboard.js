@@ -95,24 +95,13 @@ const Dashboard = (() => {
     'BAJFINANCE.NS', 'MARUTI.NS', 'SUNPHARMA.NS', 'TITAN.NS', 'ADANIENT.NS',
   ];
 
-  const NEWS = [
-    { tag: 'Markets', title: 'NIFTY 50 hits record high amid strong FII inflows', time: '10 min ago', color: '#00d4ff' },
-    { tag: 'Banking', title: 'RBI keeps repo rate unchanged at 6.5%; economy stays resilient', time: '25 min ago', color: '#7c3aed' },
-    { tag: 'Earnings', title: 'TCS Q4 results beat estimates; net profit rises 9.1% YoY', time: '1 hr ago', color: '#00d97e' },
-    { tag: 'IPO', title: 'Upcoming IPO: SME sector eyes ₹2,400 Cr fundraise this quarter', time: '2 hrs ago', color: '#f59e0b' },
-    { tag: 'Commodity', title: 'Gold prices surge to ₹72,500/10g on safe-haven demand', time: '3 hrs ago', color: '#ff9f43' },
-    { tag: 'Currency', title: 'INR appreciates against USD; touches 83.25 in early trade', time: '4 hrs ago', color: '#a78bfa' },
-    { tag: 'FII/DII', title: 'FIIs net buyers of ₹4,200 Cr; DIIs add ₹1,800 Cr in equities', time: '5 hrs ago', color: '#f87171' },
-    { tag: 'IT Sector', title: 'Infosys raises FY26 guidance; deal wins at $4.2B for the quarter', time: '6 hrs ago', color: '#60a5fa' },
-  ];
-
   let _indexHistory = {};
   let _moversData = [];
   let _currentMoversTab = 'gainers';
 
   // ── INIT ──
   const init = async () => {
-    renderNewsSection();
+    loadLiveNews();
     await Promise.all([
       loadIndexData(),
       loadTickerTape(),
@@ -402,17 +391,123 @@ const Dashboard = (() => {
     });
   };
 
-  // ── NEWS ──
-  const renderNewsSection = () => {
+  // ── HELPERS FOR NEWS ──
+  const formatRelativeTime = (date) => {
+    try {
+      const diffMs = Date.now() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins} min ago`;
+      const diffHrs = Math.floor(diffMins / 60);
+      if (diffHrs < 24) return `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`;
+      const diffDays = Math.floor(diffHrs / 24);
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } catch {
+      return '10 min ago';
+    }
+  };
+
+  const getRandomTagColor = (source) => {
+    const colors = {
+      'Yahoo Finance': '#00d4ff',
+      'NSE India': '#7c3aed',
+      'NSE': '#7c3aed',
+      'BSE': '#bb86fc',
+      'Reuters': '#00d97e',
+      'Bloomberg': '#ff9f43',
+      'CNBC': '#f59e0b',
+      'Mint': '#f87171',
+      'Moneycontrol': '#60a5fa',
+      'Economic Times': '#a78bfa'
+    };
+    return colors[source] || colors[Object.keys(colors)[Math.floor(Math.random() * Object.keys(colors).length)]];
+  };
+
+  const renderNewsItems = (newsList) => {
     const container = document.getElementById('newsList');
     if (!container) return;
 
-    container.innerHTML = NEWS.map(n => `
-      <div class="news-item" role="article">
+    container.innerHTML = newsList.map(n => `
+      <a href="${FMT.escHtml(n.url)}" class="news-item" target="_blank" rel="noopener noreferrer" role="article" style="text-decoration: none; display: block;">
         <div class="news-tag" style="background:${n.color}22;color:${n.color};border:1px solid ${n.color}44">${FMT.escHtml(n.tag)}</div>
         <div class="news-headline">${FMT.escHtml(n.title)}</div>
         <div class="news-meta"><i class="ri-time-line"></i> ${FMT.escHtml(n.time)}</div>
-      </div>`).join('');
+      </a>`).join('');
+  };
+
+  const loadLiveNews = async () => {
+    try {
+      const resp = await fetch('/api/news');
+      if (!resp.ok) throw new Error('Failed to fetch RSS');
+      const xmlText = await resp.text();
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+      const items = Array.from(xmlDoc.querySelectorAll('item')).slice(0, 8);
+      
+      if (items.length === 0) throw new Error('No items in RSS');
+
+      const newsList = items.map(item => {
+        const title = item.querySelector('title')?.textContent || '';
+        const link = item.querySelector('link')?.textContent || '#';
+        const pubDateStr = item.querySelector('pubDate')?.textContent || '';
+        
+        let source = 'Yahoo Finance';
+        const sourceNode = item.querySelector('source');
+        if (sourceNode) {
+          source = sourceNode.textContent || 'Yahoo Finance';
+        } else {
+          const desc = item.querySelector('description')?.textContent || '';
+          if (desc.includes('Reuters')) source = 'Reuters';
+          else if (desc.includes('Bloomberg')) source = 'Bloomberg';
+          else if (desc.includes('CNBC')) source = 'CNBC';
+          else if (desc.includes('MarketWatch')) source = 'MarketWatch';
+        }
+
+        const time = formatRelativeTime(new Date(pubDateStr));
+
+        return {
+          tag: source,
+          title: title,
+          time: time,
+          url: link,
+          color: getRandomTagColor(source)
+        };
+      });
+
+      renderNewsItems(newsList);
+    } catch (err) {
+      console.warn('[Samadhan] Live RSS news failed, trying search fallback:', err.message);
+      try {
+        const raw = await API.fetchYahooSearch(`/v1/finance/search?q=NSE%20India&newsCount=8&quotesCount=0&region=IN`);
+        if (raw && raw.news && raw.news.length > 0) {
+          const newsList = raw.news.slice(0, 8).map(n => {
+            const source = n.publisher || 'Yahoo Finance';
+            return {
+              tag: source,
+              title: n.title,
+              time: formatRelativeTime(new Date(n.providerPublishTime * 1000)),
+              url: n.link,
+              color: getRandomTagColor(source)
+            };
+          });
+          renderNewsItems(newsList);
+          return;
+        }
+      } catch (err2) {
+        console.warn('[Samadhan] Yahoo Search news failed, using static news fallback:', err2.message);
+      }
+
+      // Final static fallback news with actual working URLs
+      const fallbackNews = [
+        { tag: 'Yahoo Finance', title: 'NIFTY 50 hits record high amid strong FII inflows', time: '10 min ago', url: 'https://finance.yahoo.com/quote/%5ENSEI/', color: '#00d4ff' },
+        { tag: 'NSE India', title: 'NSE indices announcements and circular releases', time: '25 min ago', url: 'https://www.nseindia.com/resources/exchange-communication-circulars', color: '#7c3aed' },
+        { tag: 'Yahoo Finance', title: 'TCS Q4 results beat estimates; net profit rises 9.1% YoY', time: '1 hr ago', url: 'https://finance.yahoo.com/quote/TCS.NS/', color: '#00d97e' },
+        { tag: 'NSE India', title: 'Upcoming IPO listings and SME sector fundraising updates', time: '2 hrs ago', url: 'https://www.nseindia.com/market-data/initial-public-offerings', color: '#f59e0b' },
+        { tag: 'Yahoo Finance', title: 'Gold prices surge on safe-haven global demand', time: '3 hrs ago', url: 'https://finance.yahoo.com/quote/GC=F/', color: '#ff9f43' },
+        { tag: 'Yahoo Finance', title: 'INR appreciates against USD; touches 83.25 in early trade', time: '4 hrs ago', url: 'https://finance.yahoo.com/quote/INR=X/', color: '#a78bfa' }
+      ];
+      renderNewsItems(fallbackNews);
+    }
   };
 
   // ── REFRESH ──
@@ -422,6 +517,7 @@ const Dashboard = (() => {
       loadTickerTape(),
       loadMovers(),
       renderSectorHeatmap(),
+      loadLiveNews(),
     ]);
     renderBreadth();
   };
